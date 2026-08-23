@@ -314,17 +314,28 @@ class SyncEngine {
       const videoId = this.extractYouTubeId(url);
       if (videoId) {
         this.pendingYtVideoId = videoId;
-        if (this.ytPlayer && this.isYtReady) {
-          this.ytPlayer.loadVideoById({
-            videoId: videoId,
-            startSeconds: currentTime || 0
-          });
-          this.disableSubtitles();
-          if (!isPlaying) this.ytPlayer.pauseVideo();
+        if (this.ytPlayer && this.isYtReady && typeof this.ytPlayer.loadVideoById === 'function') {
+          try {
+            this.ytPlayer.loadVideoById(videoId, currentTime || 0);
+            this.disableSubtitles();
+            if (isPlaying) {
+              this.ytPlayer.playVideo();
+            } else {
+              setTimeout(() => {
+                if (this.ytPlayer && this.ytPlayer.pauseVideo) this.ytPlayer.pauseVideo();
+              }, 200);
+            }
+          } catch(e) {
+            console.warn('loadVideoById hatası, yeniden başlatılıyor:', e);
+            this.initYouTube();
+          }
         } else {
           this.initYouTube(() => {
-            if (currentTime) this.ytPlayer.seekTo(currentTime, true);
-            if (isPlaying) this.ytPlayer.playVideo();
+            if (this.ytPlayer && typeof this.ytPlayer.loadVideoById === 'function') {
+              this.ytPlayer.loadVideoById(videoId, currentTime || 0);
+            }
+            if (currentTime && this.ytPlayer.seekTo) this.ytPlayer.seekTo(currentTime, true);
+            if (isPlaying && this.ytPlayer.playVideo) this.ytPlayer.playVideo();
             this.disableSubtitles();
           });
         }
@@ -349,7 +360,7 @@ class SyncEngine {
 
     const isM3U8 = url.includes('.m3u8');
 
-    if (isM3U8 && Hls.isSupported()) {
+    if (isM3U8 && typeof Hls !== 'undefined' && Hls.isSupported()) {
       this.hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true
@@ -372,9 +383,29 @@ class SyncEngine {
 
   extractYouTubeId(url) {
     if (!url) return null;
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    url = url.trim();
+    if (url.length === 11 && !url.includes('/') && !url.includes('.') && !url.includes('?')) {
+      return url;
+    }
+    try {
+      if (url.includes('youtu.be/')) {
+        const id = url.split('youtu.be/')[1].split(/[?#&]/)[0];
+        if (id && id.length === 11) return id;
+      }
+      if (url.includes('youtube.com/')) {
+        const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
+        const v = urlObj.searchParams.get('v');
+        if (v && v.length === 11) return v;
+        const parts = urlObj.pathname.split('/');
+        const lastPart = parts[parts.length - 1];
+        if (lastPart && lastPart.length === 11) {
+          return lastPart.split(/[?#&]/)[0];
+        }
+      }
+    } catch(e) {}
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : url;
+    return (match && match[2] && match[2].length === 11) ? match[2] : url;
   }
 
   togglePlayPause() {
