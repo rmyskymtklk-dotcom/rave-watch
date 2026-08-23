@@ -112,14 +112,20 @@ class RoomEngine {
       this.socket.emit('heartbeat-pong');
     });
 
-    // Odaya Bağlanma
+    // Odaya Bağlanma (Kalıcı Host Kimliği)
     const username = localStorage.getItem('sync_username') || `İzleyici ${Math.floor(10 + Math.random() * 90)}`;
     const avatarColor = localStorage.getItem('sync_accent_color') || localStorage.getItem('sync_color') || '#b3001e';
+    let userToken = localStorage.getItem('sync_user_token');
+    if (!userToken) {
+      userToken = 'tok_' + Math.random().toString(36).substr(2, 9) + Date.now();
+      localStorage.setItem('sync_user_token', userToken);
+    }
 
     this.socket.emit('join-room', {
       roomId: this.roomId,
       username,
-      avatarColor
+      avatarColor,
+      userToken
     });
 
     document.getElementById('display-room-code').textContent = this.roomId;

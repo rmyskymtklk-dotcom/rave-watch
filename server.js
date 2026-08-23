@@ -277,21 +277,32 @@ io.on('connection', (socket) => {
     // Bağlantı aktif
   });
 
-  // Odaya Katılma / Oluşturma
-  socket.on('join-room', ({ roomId, username, avatarColor }) => {
+  // Odaya Katılma / Oluşturma (Kalıcı Host Kimlik Kontrolü)
+  socket.on('join-room', ({ roomId, username, avatarColor, userToken }) => {
     currentRoomId = roomId.trim().toLowerCase();
     const room = getOrCreateRoom(currentRoomId);
 
-    // Eğer ilk katılan ise Oda Sahibi (Host) yap
-    const isHost = room.users.size === 0 || room.hostId === null;
-    if (isHost) {
+    // Eğer bu token odanın kayıtlı Host'u ise veya oda yeni kuruluyorsa Host yap
+    let isHost = false;
+    if (!room.hostToken || room.hostToken === userToken) {
+      room.hostToken = userToken;
       room.hostId = socket.id;
+      isHost = true;
+      if (room.hostDisconnectTimer) {
+        clearTimeout(room.hostDisconnectTimer);
+        room.hostDisconnectTimer = null;
+      }
+    } else if (room.users.size === 0 && !room.hostDisconnectTimer) {
+      room.hostToken = userToken;
+      room.hostId = socket.id;
+      isHost = true;
     }
 
     currentUser = {
       id: socket.id,
+      userToken: userToken,
       username: username || `İzleyici ${Math.floor(1000 + Math.random() * 9000)}`,
-      avatarColor: avatarColor || '#ff1e56',
+      avatarColor: avatarColor || '#b3001e',
       isHost: isHost
     };
 
@@ -444,8 +455,8 @@ io.on('connection', (socket) => {
     io.to(currentRoomId).emit('settings-updated', room.settings);
   });
 
-  // Canlı Sohbet Mesajı
-  socket.on('chat-message', ({ text }) => {
+  // Canlı Sohbet Mesajı (Yanıt Verme / Quote Destekli)
+  socket.on('chat-message', ({ text, replyTo }) => {
     if (!currentRoomId || !currentUser || !text) return;
     const trimmed = text.trim();
     if (trimmed.length === 0) return;
@@ -457,6 +468,11 @@ io.on('connection', (socket) => {
       avatarColor: currentUser.avatarColor,
       isHost: currentUser.isHost,
       text: trimmed,
+      replyTo: replyTo ? {
+        id: replyTo.id,
+        username: replyTo.username,
+        text: replyTo.text
+      } : null,
       time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
       timestamp: Date.now()
     };
@@ -525,7 +541,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Ayrılma & Bağlantı Kopması
+  // Ayrılma & Bağlantı Kopması (Host Yenileme Koruması)
   socket.on('disconnect', () => {
     clearInterval(heartbeatInterval);
 
@@ -535,16 +551,24 @@ io.on('connection', (socket) => {
 
       console.log(`[-] ${currentUser ? currentUser.username : socket.id} ayrıldı: ${currentRoomId}`);
 
-      // Eğer ayrılan kişi Host ise, odadaki bir sonraki kullanıcıyı yeni Host yap
-      if (room.hostId === socket.id && room.users.size > 0) {
-        const nextHost = room.users.values().next().value;
-        room.hostId = nextHost.id;
-        nextHost.isHost = true;
+      // Eğer ayrılan kişi Host ise, 45 saniye bekle (Sayfa yenilemede Host değişmesin!)
+      if (room.hostId === socket.id) {
+        room.hostDisconnectTimer = setTimeout(() => {
+          if (rooms.has(currentRoomId)) {
+            const currentRoom = rooms.get(currentRoomId);
+            if (currentRoom.users.size > 0 && currentRoom.hostId === socket.id) {
+              const nextHost = currentRoom.users.values().next().value;
+              currentRoom.hostId = nextHost.id;
+              currentRoom.hostToken = nextHost.userToken;
+              nextHost.isHost = true;
 
-        io.to(currentRoomId).emit('host-transferred', {
-          newHostId: nextHost.id,
-          newHostName: nextHost.username
-        });
+              io.to(currentRoomId).emit('host-transferred', {
+                newHostId: nextHost.id,
+                newHostName: nextHost.username
+              });
+            }
+          }
+        }, 45000);
       }
 
       // Odadakilere güncelleme gönder

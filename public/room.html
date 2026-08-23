@@ -219,6 +219,19 @@
 
         <!-- Mesaj Gönderme Kutusu (Video akışını kesmez) -->
         <div class="chat-input-area">
+          <!-- Yanıtlanıyor Bildirim Çubuğu -->
+          <div id="chat-reply-preview" class="chat-reply-preview hidden">
+            <div class="reply-info">
+              <i class="fa-solid fa-reply"></i>
+              <span id="reply-to-user" class="reply-user-name">Kullanıcı</span>
+              <span class="reply-colon">:</span>
+              <span id="reply-to-text" class="reply-text-snippet">Mesaj...</span>
+            </div>
+            <button id="btn-cancel-reply" class="btn-cancel-reply" title="Yanıtı İptal Et">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
           <div class="chat-input-wrapper">
             <button class="btn-emoji-toggle" id="btn-emoji-toggle" title="Emoji Ekle">
               <i class="fa-regular fa-face-smile"></i>
