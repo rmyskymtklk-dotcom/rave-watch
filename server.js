@@ -35,11 +35,12 @@ function getOrCreateRoom(roomId) {
     rooms.set(roomId, {
       id: roomId,
       hostId: null,
+      hostToken: null,
       users: new Map(),
       media: {
-        type: 'youtube', // 'youtube' | 'html5' | 'embed' | 'webrtc'
-        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // Varsayılan video
-        title: 'Varsayılan Video',
+        type: 'idle', // Boş sinema bekleme sahnesi (İstenmeyen videolar otomatik açılmaz)
+        url: '',
+        title: '🎬 Henüz bir video veya film seçilmedi',
         currentTime: 0,
         isPlaying: false,
         lastUpdated: Date.now()
@@ -562,7 +563,7 @@ io.on('connection', (socket) => {
 
       console.log(`[-] ${currentUser ? currentUser.username : socket.id} ayrıldı: ${currentRoomId}`);
 
-      // Eğer ayrılan kişi Host ise, 45 saniye bekle (Sayfa yenilemede Host değişmesin!)
+      // Eğer ayrılan kişi Host ise, 3 dakika (180 saniye) bekle (Sayfa yenilemede Host değişmesin!)
       if (room.hostId === socket.id) {
         room.hostDisconnectTimer = setTimeout(() => {
           if (rooms.has(currentRoomId)) {
@@ -579,7 +580,7 @@ io.on('connection', (socket) => {
               });
             }
           }
-        }, 45000);
+        }, 180000); // 3 Dakika (180 saniye)
       }
 
       // Odadakilere güncelleme gönder

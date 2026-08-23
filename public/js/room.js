@@ -287,13 +287,19 @@ class RoomEngine {
     const cancelModalBtn = document.getElementById('cancel-media-modal');
     const applyMediaBtn = document.getElementById('apply-media-btn');
 
-    openModalBtn.addEventListener('click', () => {
+    const openMediaModal = () => {
       if (!this.isHost && window.syncEngine.hostOnlyControl) {
         window.showToast('🔒 Yalnızca oda sahibi video kaynağını değiştirebilir!');
         return;
       }
       mediaModal.classList.remove('hidden');
-    });
+    };
+
+    openModalBtn.addEventListener('click', openMediaModal);
+    const idlePickBtn = document.getElementById('btn-idle-pick');
+    if (idlePickBtn) {
+      idlePickBtn.addEventListener('click', openMediaModal);
+    }
 
     const hideModal = () => mediaModal.classList.add('hidden');
     closeModalBtn.addEventListener('click', hideModal);
@@ -344,35 +350,38 @@ class RoomEngine {
 
       if (type === 'youtube') {
         url = document.getElementById('input-yt-url').value.trim();
-        title = 'YouTube Videosu';
+        title = 'YouTube';
       } else if (type === 'film') {
-        url = document.getElementById('input-film-url').value.trim();
-        title = '🎬 Film / Dizi Yayını';
+        const filmUrl = document.getElementById('input-film-url').value.trim();
+        if (!filmUrl) return;
 
-        window.showToast('🔍 Film akışı taranıyor ve optimize ediliyor...');
-
-        // Otomatik Video Kaynağı Çıkarma Denemesi
+        window.showToast('🔍 Film kaynağı taranıyor...');
         try {
-          const res = await fetch(`/api/extract-video?url=${encodeURIComponent(url)}`);
-          const check = await res.json();
-          if (check.success && check.streamUrl) {
-            type = 'html5';
-            url = check.streamUrl;
-            title = '🎬 Doğrudan Film Akışı';
+          const extractRes = await fetch(`/api/extract-video?url=${encodeURIComponent(filmUrl)}`);
+          const extractData = await extractRes.json();
+
+          if (extractData.success && extractData.streamUrl) {
+            type = extractData.type === 'hls' ? 'html5' : 'html5';
+            url = extractData.streamUrl;
+            title = '🎬 Doğrudan Film Yayını';
+            window.showToast('🎉 Video akışı başarıyla ayıklandı!');
           } else {
             type = 'embed';
+            url = filmUrl;
+            title = '🎬 Film Sitesi Yayını (Proxy)';
           }
         } catch (e) {
           type = 'embed';
+          url = filmUrl;
+          title = '🎬 Film Sitesi Yayını (Proxy)';
         }
       } else if (type === 'direct') {
-        type = 'html5';
         url = document.getElementById('input-direct-url').value.trim();
-        title = 'Doğrudan Video Akışı';
+        title = url.includes('.m3u8') ? 'HLS Canlı Yayın' : 'MP4 Video';
       }
 
       if (!url && type !== 'screenshare') {
-        alert('Lütfen geçerli bir bağlantı adresi girin!');
+        window.showToast('⚠️ Lütfen geçerli bir bağlantı girin!');
         return;
       }
 
@@ -382,7 +391,7 @@ class RoomEngine {
   }
 
   // -----------------------------------------------------------
-  // ODA AYARLARI MODALI
+  // AYARLAR MODALI
   // -----------------------------------------------------------
   initSettingsModal() {
     const settingsModal = document.getElementById('settings-modal');
@@ -393,6 +402,8 @@ class RoomEngine {
     const oledModeCheck = document.getElementById('setting-oled-mode');
 
     openSettingsBtn.addEventListener('click', () => {
+      hostLockCheck.checked = window.syncEngine.hostOnlyControl;
+      hostLockCheck.disabled = !this.isHost;
       oledModeCheck.checked = document.body.classList.contains('theme-oled');
       settingsModal.classList.remove('hidden');
     });
@@ -434,8 +445,14 @@ class RoomEngine {
       this.renderUsersList();
 
       // Medyayı yükle
-      if (data.media && data.media.url) {
+      if (data.media) {
         window.syncEngine.loadMedia(data.media);
+        // Eğer odada aktif ekran paylaşımı varsa hemen akışı talep et
+        if (data.media.type === 'webrtc') {
+          setTimeout(() => {
+            this.socket.emit('request-screenshare-stream');
+          }, 450);
+        }
       }
 
       window.showToast(this.isHost ? '👑 Odanın sahibisiniz!' : '🎉 Odaya katıldınız!');

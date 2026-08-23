@@ -169,11 +169,11 @@ class WebRTCShareEngine {
     this.screenShareBtn.classList.add('btn-secondary-sm');
     this.screenShareBtnText.textContent = 'Ekran Paylaş';
 
-    // Standart YouTube katmanına geri dön
+    // Bekleme katmanına geri dön
     window.syncEngine.loadMedia({
-      type: 'youtube',
-      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      title: 'YouTube'
+      type: 'idle',
+      url: '',
+      title: '🎬 Henüz bir video veya film seçilmedi'
     });
 
     this.socket.emit('screenshare-status', { active: false });
@@ -218,8 +218,13 @@ class WebRTCShareEngine {
       window.syncEngine.loadMedia({
         type: 'webrtc',
         url: 'screenshare-live',
-        title: '📺 Canlı Ekran Yayını'
+        title: '📺 Canlı Ekran / Film Yayını'
       });
+
+      const webrtcContainer = document.getElementById('webrtc-player-container');
+      if (webrtcContainer) webrtcContainer.classList.remove('hidden');
+      const idleLayer = document.getElementById('idle-player-container');
+      if (idleLayer) idleLayer.classList.add('hidden');
 
       this.webrtcVideo.srcObject = streamToPlay;
       

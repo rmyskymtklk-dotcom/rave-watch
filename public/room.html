@@ -80,8 +80,22 @@
     <main class="player-stage-container">
       <div class="player-wrapper" id="player-wrapper">
         
+        <!-- 0. Boş / Bekleme Sahnesi (Varsayılan Sinema Ekranı) -->
+        <div id="idle-player-container" class="player-layer idle-stage">
+          <div class="idle-content">
+            <div class="idle-icon-pulse">
+              <i class="fa-solid fa-clapperboard"></i>
+            </div>
+            <h3 class="idle-title">Birlikte İzlemeye Hazır mısınız?</h3>
+            <p class="idle-desc">YouTube, Film Siteleri veya Ekran Paylaşımı başlatarak yayına geçin.</p>
+            <button class="cyber-btn btn-primary btn-idle-pick" id="btn-idle-pick">
+              <i class="fa-solid fa-play"></i> Video / Film Seç
+            </button>
+          </div>
+        </div>
+
         <!-- 1. YouTube Oynatıcısı -->
-        <div id="youtube-player-container" class="player-layer">
+        <div id="youtube-player-container" class="player-layer hidden">
           <div id="youtube-iframe-target"></div>
         </div>
 

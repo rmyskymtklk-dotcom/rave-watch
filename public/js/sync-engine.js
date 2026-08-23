@@ -126,11 +126,13 @@ class SyncEngine {
   // YOUTUBE OYNATICI (ALTYAZISIZ & ARKA PLAN KESİNTİSİZ)
   // -----------------------------------------------------------
   initYouTube(onReadyCallback) {
+    if (!this.pendingYtVideoId) return;
+
     if (window.YT && window.YT.Player) {
       this.ytPlayer = new YT.Player('youtube-iframe-target', {
         height: '100%',
         width: '100%',
-        videoId: this.pendingYtVideoId || 'dQw4w9WgXcQ',
+        videoId: this.pendingYtVideoId,
         playerVars: {
           autoplay: 0,
           controls: 0,
@@ -333,6 +335,8 @@ class SyncEngine {
     }
 
     // 2. Tüm katmanları gizle
+    const idleLayer = document.getElementById('idle-player-container');
+    if (idleLayer) idleLayer.classList.add('hidden');
     document.getElementById('youtube-player-container').classList.add('hidden');
     document.getElementById('html5-player-container').classList.add('hidden');
     document.getElementById('webrtc-player-container').classList.add('hidden');
@@ -340,6 +344,15 @@ class SyncEngine {
 
     this.mediaTypeBadge.textContent = this.currentMediaType.toUpperCase();
     this.currentMediaTitle.textContent = title || url || 'Medya Yayını';
+
+    // Boş / Bekleme Durumu
+    if (this.currentMediaType === 'idle' || (!url && this.currentMediaType !== 'webrtc')) {
+      if (idleLayer) idleLayer.classList.remove('hidden');
+      this.mediaTypeBadge.textContent = 'BEKLEMEDE';
+      this.currentMediaTitle.textContent = '🎬 Henüz bir video veya film seçilmedi';
+      this.updatePlayPauseIcon(false);
+      return;
+    }
 
     // 3. İlgili katmanı aç ve başlat
     if (this.currentMediaType === 'youtube') {
