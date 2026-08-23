@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * SYNCPARTY SYNC ENGINE (SENKRONİZASYON MOTORU)
- * YouTube IFrame (Altyazısız), HTML5 Video, HLS.js ve WebRTC Oynatıcı
+ * YouTube IFrame (Altyazısız & Arka Planda Kesintisiz), HTML5 Video, HLS & WebRTC
  * ============================================================================
  */
 
@@ -42,15 +42,17 @@ class SyncEngine {
     this.mediaTypeBadge = document.getElementById('media-type-badge');
     this.currentMediaTitle = document.getElementById('current-media-title');
     this.hostLockTag = document.getElementById('host-lock-tag');
+    this.pipBtn = document.getElementById('ctrl-pip');
 
     // Bağımsız Yerel Ses Düzeyi (Varsayılan: %80)
     this.localVolume = parseFloat(localStorage.getItem('sync_volume') || '80');
     this.isMuted = localStorage.getItem('sync_muted') === 'true';
 
-    // Senkronizasyon Durumu
+    // Senkronizasyon ve Arka Plan Oynatma Durumu
     this.isSeeking = false;
     this.ignoreNextPlayEvent = false;
     this.ignoreNextPauseEvent = false;
+    this.userInitiatedPause = false; // Kullanıcı mı durdurdu yoksa sekme değiştiği için tarayıcı mı durdurdu?
     this.lastHostSyncTime = 0;
 
     this.initUI();
@@ -100,10 +102,9 @@ class SyncEngine {
       this.html5Video.muted = this.isMuted;
     }
 
-    // WebRTC Sesi (İzleyici için)
+    // WebRTC Sesi
     if (this.webrtcVideo) {
       this.webrtcVideo.volume = vol / 100;
-      // Host ise yankıyı önlemek için sessiz, izleyici ise unmuted
       if (window.webrtcEngine && window.webrtcEngine.isSharing) {
         this.webrtcVideo.muted = true;
       } else {
@@ -122,7 +123,7 @@ class SyncEngine {
   }
 
   // -----------------------------------------------------------
-  // YOUTUBE OYNATICI (ALTYAZILAR KESİNLİKLE KAPALI)
+  // YOUTUBE OYNATICI (ALTYAZISIZ & ARKA PLAN KESİNTİSİZ)
   // -----------------------------------------------------------
   initYouTube(onReadyCallback) {
     if (window.YT && window.YT.Player) {
@@ -139,7 +140,7 @@ class SyncEngine {
           modestbranding: 1,
           rel: 0,
           iv_load_policy: 3,
-          cc_load_policy: 0, // Altyazı otomatik açılmasın
+          cc_load_policy: 0,
           cc_lang_pref: 'none'
         },
         events: {
@@ -161,7 +162,6 @@ class SyncEngine {
     }
   }
 
-  // Altyazıları Kesin Olarak Kapatma Fonksiyonu
   disableSubtitles() {
     try {
       if (this.ytPlayer && typeof this.ytPlayer.setOption === 'function') {
@@ -172,25 +172,32 @@ class SyncEngine {
         this.ytPlayer.unloadModule('captions');
         this.ytPlayer.unloadModule('cc');
       }
-    } catch (e) {
-      // Hata durumunda yoksay
-    }
+    } catch (e) {}
   }
 
   handleYouTubeStateChange(event) {
     if (this.isHost) {
       const curTime = this.ytPlayer.getCurrentTime() || 0;
       if (event.data === YT.PlayerState.PLAYING) {
+        this.userInitiatedPause = false;
         this.disableSubtitles();
+        this.updateMediaSession(this.currentMediaTitle.textContent, true);
         if (!this.ignoreNextPlayEvent) {
           this.socket.emit('media-action', { action: 'play', currentTime: curTime });
           this.updatePlayPauseIcon(true);
         }
         this.ignoreNextPlayEvent = false;
       } else if (event.data === YT.PlayerState.PAUSED) {
-        if (!this.ignoreNextPauseEvent) {
+        // Sekme değiştiği için tarayıcı durdurduysa odaya duraklatma gönderme, devam ettir!
+        if (document.hidden && !this.userInitiatedPause) {
+          this.ytPlayer.playVideo();
+          return;
+        }
+
+        if (!this.ignoreNextPauseEvent && this.userInitiatedPause) {
           this.socket.emit('media-action', { action: 'pause', currentTime: curTime });
           this.updatePlayPauseIcon(false);
+          this.updateMediaSession(this.currentMediaTitle.textContent, false);
         }
         this.ignoreNextPauseEvent = false;
       }
@@ -223,6 +230,12 @@ class SyncEngine {
       });
     }
 
+    if (this.pipBtn) {
+      this.pipBtn.addEventListener('click', () => {
+        this.togglePictureInPicture();
+      });
+    }
+
     this.progressContainer.addEventListener('click', (e) => {
       if (!this.canControl()) {
         window.showToast('🔒 Yalnızca oda sahibi videoyu sarabilir!');
@@ -252,6 +265,7 @@ class SyncEngine {
       this.progressTooltip.style.display = 'none';
     });
 
+    // Düzenli Zaman Güncelleme Döngüsü
     setInterval(() => {
       this.updateProgressUI();
       if (this.isHost && this.currentMediaType === 'youtube') {
@@ -265,6 +279,24 @@ class SyncEngine {
     }, 1000);
   }
 
+  async togglePictureInPicture() {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        if (this.currentMediaType === 'webrtc' && this.webrtcVideo) {
+          await this.webrtcVideo.requestPictureInPicture();
+        } else if (this.currentMediaType === 'html5' && this.html5Video) {
+          await this.html5Video.requestPictureInPicture();
+        } else {
+          window.showToast('ℹ️ PiP modu ekran paylaşımı ve doğrudan video oynatıcıda etkindir.');
+        }
+      }
+    } catch (err) {
+      console.warn('PiP başlatılamadı:', err);
+    }
+  }
+
   canControl() {
     if (this.isHost) return true;
     if (!this.hostOnlyControl) return true;
@@ -272,14 +304,14 @@ class SyncEngine {
   }
 
   // -----------------------------------------------------------
-  // MEDYA YÜKLEME VE OYNATICI DEĞİŞTİRME (ARKADAKİ SESLERİ KESER)
+  // MEDYA YÜKLEME VE OYNATICI DEĞİŞTİRME
   // -----------------------------------------------------------
   loadMedia(mediaData) {
     const { type, url, title, currentTime, isPlaying } = mediaData;
     this.currentMediaType = type || 'youtube';
     this.currentMediaUrl = url;
 
-    // 1. Önceki tüm medya oynatıcılarını durdur / sustur (Arkada YouTube çalmasını engeller)
+    // 1. Önceki tüm medya oynatıcılarını durdur / sustur
     if (this.ytPlayer && this.isYtReady && typeof this.ytPlayer.pauseVideo === 'function') {
       try {
         this.ytPlayer.pauseVideo();
@@ -320,14 +352,15 @@ class SyncEngine {
             this.ytPlayer.loadVideoById(videoId, currentTime || 0);
             this.disableSubtitles();
             if (isPlaying) {
+              this.userInitiatedPause = false;
               this.ytPlayer.playVideo();
             } else {
+              this.userInitiatedPause = true;
               setTimeout(() => {
                 if (this.ytPlayer && this.ytPlayer.pauseVideo) this.ytPlayer.pauseVideo();
               }, 200);
             }
           } catch(e) {
-            console.warn('loadVideoById hatası, yeniden başlatılıyor:', e);
             this.initYouTube();
           }
         } else {
@@ -336,7 +369,10 @@ class SyncEngine {
               this.ytPlayer.loadVideoById(videoId, currentTime || 0);
             }
             if (currentTime && this.ytPlayer.seekTo) this.ytPlayer.seekTo(currentTime, true);
-            if (isPlaying && this.ytPlayer.playVideo) this.ytPlayer.playVideo();
+            if (isPlaying) {
+              this.userInitiatedPause = false;
+              if (this.ytPlayer.playVideo) this.ytPlayer.playVideo();
+            }
             this.disableSubtitles();
           });
         }
@@ -351,6 +387,8 @@ class SyncEngine {
     } else if (this.currentMediaType === 'webrtc') {
       document.getElementById('webrtc-player-container').classList.remove('hidden');
     }
+
+    this.updateMediaSession(title, isPlaying);
   }
 
   loadHtml5Video(url, startTime, isPlaying) {
@@ -370,13 +408,19 @@ class SyncEngine {
       this.hls.attachMedia(this.html5Video);
       this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (startTime) this.html5Video.currentTime = startTime;
-        if (isPlaying) this.html5Video.play().catch(() => {});
+        if (isPlaying) {
+          this.userInitiatedPause = false;
+          this.html5Video.play().catch(() => {});
+        }
       });
     } else {
       this.html5Video.src = url;
       this.html5Video.load();
       if (startTime) this.html5Video.currentTime = startTime;
-      if (isPlaying) this.html5Video.play().catch(() => {});
+      if (isPlaying) {
+        this.userInitiatedPause = false;
+        this.html5Video.play().catch(() => {});
+      }
     }
 
     this.applyVolume();
@@ -412,13 +456,16 @@ class SyncEngine {
   togglePlayPause() {
     const isPlaying = this.getIsPlaying();
     if (isPlaying) {
+      this.userInitiatedPause = true;
       this.pause(true);
     } else {
+      this.userInitiatedPause = false;
       this.play(true);
     }
   }
 
   play(emit = false) {
+    this.userInitiatedPause = false;
     if (this.currentMediaType === 'youtube' && this.ytPlayer && this.isYtReady) {
       this.ignoreNextPlayEvent = !emit;
       this.disableSubtitles();
@@ -428,6 +475,7 @@ class SyncEngine {
     }
 
     this.updatePlayPauseIcon(true);
+    this.updateMediaSession(this.currentMediaTitle.textContent, true);
 
     if (emit && this.isHost) {
       this.socket.emit('media-action', {
@@ -438,6 +486,7 @@ class SyncEngine {
   }
 
   pause(emit = false) {
+    this.userInitiatedPause = true;
     if (this.currentMediaType === 'youtube' && this.ytPlayer && this.isYtReady) {
       this.ignoreNextPauseEvent = !emit;
       this.ytPlayer.pauseVideo();
@@ -446,6 +495,7 @@ class SyncEngine {
     }
 
     this.updatePlayPauseIcon(false);
+    this.updateMediaSession(this.currentMediaTitle.textContent, false);
 
     if (emit && this.isHost) {
       this.socket.emit('media-action', {
@@ -556,8 +606,10 @@ class SyncEngine {
 
     this.socket.on('media-action-broadcast', ({ action, currentTime, isPlaying }) => {
       if (action === 'play') {
+        this.userInitiatedPause = false;
         this.play(false);
       } else if (action === 'pause') {
+        this.userInitiatedPause = true;
         this.pause(false);
       }
 
@@ -581,8 +633,10 @@ class SyncEngine {
 
       const myIsPlaying = this.getIsPlaying();
       if (isPlaying && !myIsPlaying) {
+        this.userInitiatedPause = false;
         this.play(false);
       } else if (!isPlaying && myIsPlaying) {
+        this.userInitiatedPause = true;
         this.pause(false);
       }
     });
@@ -591,12 +645,17 @@ class SyncEngine {
       if (typeof currentTime === 'number') {
         this.seekTo(currentTime, false);
       }
-      if (isPlaying) this.play(false);
-      else this.pause(false);
+      if (isPlaying) {
+        this.userInitiatedPause = false;
+        this.play(false);
+      } else {
+        this.userInitiatedPause = true;
+        this.pause(false);
+      }
       window.showToast('⚡ Host ile anında eşitlendi!');
     });
 
-    // Host için: İzleyici "Yeniden Eşitle" istediğinde milisaniyelik süreyi raporla
+    // Host için: İzleyici "Yeniden Eşitle" istediğinde milisaniyelik süreyi anında bildir
     this.socket.on('host-ping-time-for-guest', ({ guestId }) => {
       if (this.isHost) {
         this.socket.emit('host-pong-time', {
@@ -614,7 +673,7 @@ class SyncEngine {
   }
 
   // -----------------------------------------------------------
-  // MOBİL ARKA PLANDA ÇALMA VE KİLİT EKRANI (MediaSession & KeepAlive)
+  // MOBİL & PC ARKA PLANDA ÇALMA VE KİLİT EKRANI (KeepAlive)
   // -----------------------------------------------------------
   setupBackgroundPlayback() {
     // 1. MediaSession API (Android/iOS Kilit ekranı ve bildirim kontrolleri)
@@ -628,11 +687,10 @@ class SyncEngine {
       } catch(e) {}
     }
 
-    // 2. Tarayıcı arka plana geçtiğinde / ekran kilitlendiğinde sesin kesilmesini önle
+    // 2. Tarayıcı arka plana geçtiğinde / ekran kilitlendiğinde sesin kesilmesini engelle
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
-        const isPlaying = this.getIsPlaying();
-        if (isPlaying) {
+        if (!this.userInitiatedPause) {
           if (this.html5Video && this.html5Video.paused) {
             this.html5Video.play().catch(() => {});
           }
@@ -646,16 +704,30 @@ class SyncEngine {
       }
     });
 
-    // 3. Mobil ses oturumunu canlı tutma tetikleyicisi (Kullanıcı ilk tıkladığında başlar)
+    window.addEventListener('blur', () => {
+      if (!this.userInitiatedPause) {
+        if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
+          this.ytPlayer.playVideo();
+        }
+      }
+    });
+
+    // 3. Mobil ses oturumunu (Active Audio Session) canlı tutma döngüsü
     const unlockAudio = () => {
       try {
+        const keepAliveAudio = document.getElementById('keepalive-audio');
+        if (keepAliveAudio) {
+          keepAliveAudio.src = 'data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YRAAAAAAAAAAAAAAAAAA';
+          keepAliveAudio.play().catch(() => {});
+        }
+
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         if (AudioContext) {
           const ctx = new AudioContext();
           if (ctx.state === 'suspended') ctx.resume();
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
-          gain.gain.value = 0.0001; // Duyulmayacak arka plan sinyali (Sesi canlı tutar)
+          gain.gain.value = 0.00001; // İnsan kulağının duymayacağı seviyede mobil oturumu canlı tutar
           osc.connect(gain);
           gain.connect(ctx.destination);
           osc.start(0);

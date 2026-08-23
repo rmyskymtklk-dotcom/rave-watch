@@ -149,6 +149,11 @@
             </div>
 
             <div class="controls-right">
+              <!-- Resim İçinde Resim (Picture-in-Picture) Butonu -->
+              <button class="ctrl-btn" id="ctrl-pip" title="Resim İçinde Resim (PiP - Sekme Değişse Bile Üstte Kalır)">
+                <i class="fa-solid fa-clone"></i>
+              </button>
+
               <!-- Ekran Paylaşımı Boyutlandırma / Boşluk Doldurma Butonu -->
               <button class="ctrl-btn" id="btn-toggle-fit" title="Ekranı Tam Oturt / Sığdır">
                 <i class="fa-solid fa-up-right-and-down-left-from-center" id="fit-icon"></i>
@@ -171,6 +176,9 @@
             </div>
           </div>
         </div>
+
+        <!-- Mobil / Arka Plan Ses Canlı Tutucusu (Sessiz Audio Loop) -->
+        <audio id="keepalive-audio" loop playsinline preload="auto" style="display:none;"></audio>
       </div>
 
       <!-- Video Altı Bilgi Çubuğu -->
