@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "live": "node start-live.js",
     "dev": "node server.js",
     "build-zip": "node zip-builder.js"
   },

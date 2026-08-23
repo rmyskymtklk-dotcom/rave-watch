@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * SYNCPARTY SYNC ENGINE (SENKRONİZASYON MOTORU)
- * YouTube IFrame, HTML5 Video, HLS.js ve Proxy Oynatıcı Entegrasyonu
+ * YouTube IFrame (Altyazısız), HTML5 Video, HLS.js ve WebRTC Oynatıcı
  * ============================================================================
  */
 
@@ -99,10 +99,15 @@ class SyncEngine {
       this.html5Video.muted = this.isMuted;
     }
 
-    // WebRTC Sesi
+    // WebRTC Sesi (İzleyici için)
     if (this.webrtcVideo) {
       this.webrtcVideo.volume = vol / 100;
-      this.webrtcVideo.muted = this.isMuted;
+      // Host ise yankıyı önlemek için sessiz, izleyici ise unmuted
+      if (window.webrtcEngine && window.webrtcEngine.isSharing) {
+        this.webrtcVideo.muted = true;
+      } else {
+        this.webrtcVideo.muted = this.isMuted;
+      }
     }
 
     // İkon Güncelle
@@ -116,7 +121,7 @@ class SyncEngine {
   }
 
   // -----------------------------------------------------------
-  // YOUTUBE VE HTML5 OYNATICI BAŞLATMA
+  // YOUTUBE OYNATICI (ALTYAZILAR KESİNLİKLE KAPALI)
   // -----------------------------------------------------------
   initYouTube(onReadyCallback) {
     if (window.YT && window.YT.Player) {
@@ -126,17 +131,20 @@ class SyncEngine {
         videoId: this.pendingYtVideoId || 'dQw4w9WgXcQ',
         playerVars: {
           autoplay: 0,
-          controls: 0, // Özel kontrol çubuğumuz kullanılacak
+          controls: 0,
           disablekb: 1,
           enablejsapi: 1,
           fs: 0,
           modestbranding: 1,
           rel: 0,
-          iv_load_policy: 3
+          iv_load_policy: 3,
+          cc_load_policy: 0, // Altyazı otomatik açılmasın
+          cc_lang_pref: 'none'
         },
         events: {
           onReady: (event) => {
             this.isYtReady = true;
+            this.disableSubtitles();
             this.applyVolume();
             if (onReadyCallback) onReadyCallback();
           },
@@ -146,18 +154,33 @@ class SyncEngine {
         }
       });
     } else {
-      // API henüz yüklenmediyse bekle
       window.onYouTubeIframeAPIReady = () => {
         this.initYouTube(onReadyCallback);
       };
     }
   }
 
+  // Altyazıları Kesin Olarak Kapatma Fonksiyonu
+  disableSubtitles() {
+    try {
+      if (this.ytPlayer && typeof this.ytPlayer.setOption === 'function') {
+        this.ytPlayer.setOption('captions', 'track', {});
+        this.ytPlayer.setOption('cc', 'track', {});
+      }
+      if (this.ytPlayer && typeof this.ytPlayer.unloadModule === 'function') {
+        this.ytPlayer.unloadModule('captions');
+        this.ytPlayer.unloadModule('cc');
+      }
+    } catch (e) {
+      // Hata durumunda yoksay
+    }
+  }
+
   handleYouTubeStateChange(event) {
-    // YT.PlayerState: PLAYING (1), PAUSED (2), BUFFERING (3), CUED (5)
     if (this.isHost) {
       const curTime = this.ytPlayer.getCurrentTime() || 0;
       if (event.data === YT.PlayerState.PLAYING) {
+        this.disableSubtitles();
         if (!this.ignoreNextPlayEvent) {
           this.socket.emit('media-action', { action: 'play', currentTime: curTime });
           this.updatePlayPauseIcon(true);
@@ -177,7 +200,6 @@ class SyncEngine {
   // ARAYÜZ (UI) ETKİLEŞİMLERİ VE KONTROLLER
   // -----------------------------------------------------------
   initUI() {
-    // Oynat / Duraklat Butonu
     this.playPauseBtn.addEventListener('click', () => {
       if (!this.isHost && this.hostOnlyControl) {
         window.showToast('⚠️ Videoyu yalnızca oda sahibi duraklatabilir veya başlatabilir.');
@@ -186,7 +208,6 @@ class SyncEngine {
       this.togglePlayPause();
     });
 
-    // 10sn İleri / Geri (Sadece Host)
     const ctrlBackward = document.getElementById('ctrl-backward');
     const ctrlForward = document.getElementById('ctrl-forward');
 
@@ -201,7 +222,6 @@ class SyncEngine {
       });
     }
 
-    // İlerleme Çubuğuna Tıklama / Sarma (Host Kilidi Kontrolü)
     this.progressContainer.addEventListener('click', (e) => {
       if (!this.canControl()) {
         window.showToast('🔒 Yalnızca oda sahibi videoyu sarabilir!');
@@ -216,7 +236,6 @@ class SyncEngine {
       }
     });
 
-    // İlerleme Çubuğu Tooltip
     this.progressContainer.addEventListener('mousemove', (e) => {
       const rect = this.progressContainer.getBoundingClientRect();
       const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -232,23 +251,9 @@ class SyncEngine {
       this.progressTooltip.style.display = 'none';
     });
 
-    // Tam Ekran Butonu
-    const fullscreenBtn = document.getElementById('ctrl-fullscreen');
-    if (fullscreenBtn) {
-      fullscreenBtn.addEventListener('click', () => {
-        const playerWrapper = document.getElementById('player-wrapper');
-        if (!document.fullscreenElement) {
-          playerWrapper.requestFullscreen().catch(err => console.error(err));
-        } else {
-          document.exitFullscreen();
-        }
-      });
-    }
-
-    // Düzenli Zaman Güncelleme Döngüsü (UI & Host Heartbeat)
     setInterval(() => {
       this.updateProgressUI();
-      if (this.isHost) {
+      if (this.isHost && this.currentMediaType === 'youtube') {
         const curTime = this.getCurrentTime();
         const isPlaying = this.getIsPlaying();
         this.socket.emit('host-sync-heartbeat', {
@@ -266,14 +271,35 @@ class SyncEngine {
   }
 
   // -----------------------------------------------------------
-  // MEDYA YÜKLEME VE OYNATICI DEĞİŞTİRME
+  // MEDYA YÜKLEME VE OYNATICI DEĞİŞTİRME (ARKADAKİ SESLERİ KESER)
   // -----------------------------------------------------------
   loadMedia(mediaData) {
     const { type, url, title, currentTime, isPlaying } = mediaData;
     this.currentMediaType = type || 'youtube';
     this.currentMediaUrl = url;
 
-    // Tüm katmanları gizle
+    // 1. Önceki tüm medya oynatıcılarını durdur / sustur (Arkada YouTube çalmasını engeller)
+    if (this.ytPlayer && this.isYtReady && typeof this.ytPlayer.pauseVideo === 'function') {
+      try {
+        this.ytPlayer.pauseVideo();
+        if (this.currentMediaType !== 'youtube') {
+          this.ytPlayer.stopVideo();
+        }
+      } catch (e) {}
+    }
+    if (this.html5Video) {
+      try {
+        this.html5Video.pause();
+        if (this.currentMediaType !== 'html5') {
+          this.html5Video.src = '';
+        }
+      } catch (e) {}
+    }
+    if (this.embedIframe && this.currentMediaType !== 'embed') {
+      this.embedIframe.src = 'about:blank';
+    }
+
+    // 2. Tüm katmanları gizle
     document.getElementById('youtube-player-container').classList.add('hidden');
     document.getElementById('html5-player-container').classList.add('hidden');
     document.getElementById('webrtc-player-container').classList.add('hidden');
@@ -282,6 +308,7 @@ class SyncEngine {
     this.mediaTypeBadge.textContent = this.currentMediaType.toUpperCase();
     this.currentMediaTitle.textContent = title || url || 'Medya Yayını';
 
+    // 3. İlgili katmanı aç ve başlat
     if (this.currentMediaType === 'youtube') {
       document.getElementById('youtube-player-container').classList.remove('hidden');
       const videoId = this.extractYouTubeId(url);
@@ -292,11 +319,13 @@ class SyncEngine {
             videoId: videoId,
             startSeconds: currentTime || 0
           });
+          this.disableSubtitles();
           if (!isPlaying) this.ytPlayer.pauseVideo();
         } else {
           this.initYouTube(() => {
             if (currentTime) this.ytPlayer.seekTo(currentTime, true);
             if (isPlaying) this.ytPlayer.playVideo();
+            this.disableSubtitles();
           });
         }
       }
@@ -305,7 +334,6 @@ class SyncEngine {
       this.loadHtml5Video(url, currentTime, isPlaying);
     } else if (this.currentMediaType === 'embed') {
       document.getElementById('embed-player-container').classList.remove('hidden');
-      // Akıllı sunucu proxy'miz üzerinden yükle
       const proxyUrl = `/api/proxy-embed?url=${encodeURIComponent(url)}`;
       this.embedIframe.src = proxyUrl;
     } else if (this.currentMediaType === 'webrtc') {
@@ -349,9 +377,6 @@ class SyncEngine {
     return (match && match[2].length === 11) ? match[2] : url;
   }
 
-  // -----------------------------------------------------------
-  // OYNATMA / DURAKLATMA / SARMA
-  // -----------------------------------------------------------
   togglePlayPause() {
     const isPlaying = this.getIsPlaying();
     if (isPlaying) {
@@ -364,6 +389,7 @@ class SyncEngine {
   play(emit = false) {
     if (this.currentMediaType === 'youtube' && this.ytPlayer && this.isYtReady) {
       this.ignoreNextPlayEvent = !emit;
+      this.disableSubtitles();
       this.ytPlayer.playVideo();
     } else if (this.currentMediaType === 'html5' && this.html5Video) {
       this.html5Video.play().catch(() => {});
@@ -400,6 +426,7 @@ class SyncEngine {
   seekTo(seconds, emit = false) {
     if (this.currentMediaType === 'youtube' && this.ytPlayer && this.isYtReady) {
       this.ytPlayer.seekTo(seconds, true);
+      this.disableSubtitles();
     } else if (this.currentMediaType === 'html5' && this.html5Video) {
       this.html5Video.currentTime = seconds;
     }
@@ -466,7 +493,6 @@ class SyncEngine {
       this.progressCurrent.style.width = `${pct}%`;
       this.progressHandle.style.left = `${pct}%`;
 
-      // Buffer Göstergesi
       if (this.currentMediaType === 'youtube' && this.ytPlayer && this.isYtReady && typeof this.ytPlayer.getVideoLoadedFraction === 'function') {
         const loaded = this.ytPlayer.getVideoLoadedFraction() || 0;
         this.progressBuffered.style.width = `${loaded * 100}%`;
@@ -490,17 +516,12 @@ class SyncEngine {
     return `${pad(mins)}:${pad(secs)}`;
   }
 
-  // -----------------------------------------------------------
-  // SOCKET.IO SENKRONİZASYON DİNLENMESİ
-  // -----------------------------------------------------------
   initSocketEvents() {
-    // Medya Değiştiğinde
     this.socket.on('media-changed', (mediaData) => {
       this.loadMedia(mediaData);
       window.showToast(`🎬 Yeni medya yüklendi: ${mediaData.title || 'Video'}`);
     });
 
-    // Host Eylemi Geldiğinde (Oynat / Duraklat / Sar)
     this.socket.on('media-action-broadcast', ({ action, currentTime, isPlaying }) => {
       if (action === 'play') {
         this.play(false);
@@ -516,19 +537,16 @@ class SyncEngine {
       }
     });
 
-    // Yumuşak Drift Senkronizasyonu (Sync Time Update)
     this.socket.on('sync-time-update', ({ currentTime, isPlaying }) => {
-      if (this.isHost) return; // Host zaten kaynak
+      if (this.isHost) return;
 
       const myTime = this.getCurrentTime();
       const delta = Math.abs(myTime - currentTime);
 
-      // Sapma 1.5 saniyeden büyükse doğrudan atla
       if (delta > 1.5) {
         this.seekTo(currentTime, false);
       }
 
-      // Oynatma durumunu senkronize et
       const myIsPlaying = this.getIsPlaying();
       if (isPlaying && !myIsPlaying) {
         this.play(false);
@@ -537,14 +555,12 @@ class SyncEngine {
       }
     });
 
-    // Host Kilit Zorlaması
     this.socket.on('sync-force', ({ currentTime, isPlaying }) => {
       this.seekTo(currentTime, false);
       if (isPlaying) this.play(false);
       else this.pause(false);
     });
 
-    // Ayar Güncellemesi
     this.socket.on('settings-updated', (settings) => {
       this.hostOnlyControl = settings.hostOnlyControl;
       this.updateHostLockIndicator();
