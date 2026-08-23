@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * SYNCPARTY WEBRTC SCREEN & TAB AUDIO SHARING ENGINE
- * STUN & TURN Destekli, F5 Yenileme ve Sonradan Giriş Garantili WebRTC Motoru
+ * Kesintisiz Canlı Ekran & Film Yayını (Autoplay Korumalı, Anında Açılır)
  * ============================================================================
  */
 
@@ -18,13 +18,16 @@ class WebRTCShareEngine {
     this.autoplayOverlay = document.getElementById('webrtc-autoplay-overlay');
     this.resumeLiveBtn = document.getElementById('btn-resume-live');
 
-    // STUN + ÜCRETSİZ TURN SUNUCULARI (Farklı Ev/Mobil Ağlar Arası NAT Geçiş Garantisi)
+    // Genişletilmiş Yüksek Hızlı STUN + TURN Sunucu Havuzu
     this.rtcConfig = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun.services.mozilla.com' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:stun.cloudflare.com:3478' },
+        { urls: 'stun:global.stun.twilio.com:3478' },
         {
           urls: 'turn:openrelay.metered.ca:80',
           username: 'openrelay',
@@ -48,31 +51,43 @@ class WebRTCShareEngine {
   }
 
   init() {
-    // Video element ayarları
     if (this.webrtcVideo) {
       this.webrtcVideo.setAttribute('autoplay', '');
       this.webrtcVideo.setAttribute('playsinline', '');
       this.webrtcVideo.setAttribute('webkit-playsinline', '');
       this.webrtcVideo.playsInline = true;
+      this.webrtcVideo.muted = true;
     }
 
-    // Autoplay Kilit Çözücü Buton
-    if (this.resumeLiveBtn) {
-      this.resumeLiveBtn.addEventListener('click', (e) => {
+    // "Yayını Başlat & Sesi Aç" Butonuna Basıldığında
+    const handleUnmuteClick = (e) => {
+      if (e) {
         e.preventDefault();
         e.stopPropagation();
-        this.unlockAudioAndPlay();
-      });
-    }
+      }
+      this.unlockAudioAndPlay();
+    };
 
+    if (this.resumeLiveBtn) {
+      this.resumeLiveBtn.addEventListener('click', handleUnmuteClick);
+    }
     if (this.autoplayOverlay) {
-      this.autoplayOverlay.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.unlockAudioAndPlay();
+      this.autoplayOverlay.addEventListener('click', handleUnmuteClick);
+    }
+
+    // Video alanının herhangi bir yerine tıklandığında sesi aç
+    const playerWrapper = document.getElementById('player-wrapper');
+    if (playerWrapper) {
+      playerWrapper.addEventListener('click', () => {
+        if (this.webrtcVideo && this.webrtcVideo.muted && !this.isSharing) {
+          this.webrtcVideo.muted = false;
+          window.syncEngine.applyVolume();
+          if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
+        }
       });
     }
 
-    // Ekran Paylaşım Butonu
+    // Ekran Paylaşım Butonu (Host)
     if (this.screenShareBtn) {
       this.screenShareBtn.addEventListener('click', () => {
         if (this.isSharing) {
@@ -88,18 +103,18 @@ class WebRTCShareEngine {
       await this.handleSignal(senderId, signal, type);
     });
 
-    // Yeni kullanıcı odaya girdiğinde (Host tarafı akış gönderir)
+    // Yeni kullanıcı odaya girdiğinde (Host tarafı canlı akışı anında iletir)
     this.socket.on('user-joined', ({ user }) => {
       if (this.isSharing && this.localStream && user.id !== this.socket.id) {
-        console.log('[WebRTC] Yeni katılımcı algılandı, canlı akış teklifi gönderiliyor:', user.id);
+        console.log('[WebRTC] Yeni kullanıcı katıldı, canlı akış teklifi gönderiliyor:', user.id);
         this.createPeerConnection(user.id, true);
       }
     });
 
-    // İzleyici F5 attığında veya sonradan odaya girdiğinde gelen doğrudan talep
+    // İzleyici F5 attığında veya sonradan odaya girdiğinde gelen talep
     this.socket.on('guest-requested-screenshare', ({ guestId }) => {
       if (this.isSharing && this.localStream) {
-        console.log('[WebRTC] İzleyici akış talep etti, teklif oluşturuluyor:', guestId);
+        console.log('[WebRTC] İzleyiciden akış talebi alındı, yeniden bağlanılıyor:', guestId);
         this.createPeerConnection(guestId, true);
       }
     });
@@ -109,14 +124,14 @@ class WebRTCShareEngine {
       if (!this.isSharing) {
         if (active) {
           window.syncEngine.loadMedia(media);
-          window.showToast('📺 Ekran yayını aktif, bağlanılıyor...');
-          // Host'tan doğrudan akış iste
+          window.showToast('📺 Canlı ekran yayını başlatıldı...');
+          if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
           setTimeout(() => {
             this.socket.emit('request-screenshare-stream');
-          }, 300);
+          }, 200);
         } else {
           window.syncEngine.loadMedia(media);
-          window.showToast('📺 Ekran paylaşımı sonlandırıldı.');
+          window.showToast('📺 Ekran yayını sonlandırıldı.');
           if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
         }
       }
@@ -124,34 +139,31 @@ class WebRTCShareEngine {
   }
 
   unlockAudioAndPlay() {
-    window.showToast('🔄 Canlı yayın akışı başlatılıyor...');
+    if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
+    window.showToast('🔊 Canlı yayın başlatıldı ve ses açıldı.');
 
     const webrtcContainer = document.getElementById('webrtc-player-container');
     if (webrtcContainer) webrtcContainer.classList.remove('hidden');
     const idleLayer = document.getElementById('idle-player-container');
     if (idleLayer) idleLayer.classList.add('hidden');
 
-    // Host'tan akışı tekrar talep et
+    // Sunucudan ve Host'tan akışı tazelemesini iste
     this.socket.emit('request-screenshare-stream');
 
     if (this.webrtcVideo) {
       this.webrtcVideo.muted = false;
       this.webrtcVideo.play().then(() => {
-        if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
         window.syncEngine.applyVolume();
-      }).catch(err => {
-        console.warn('Sessiz başlatılıyor:', err);
+      }).catch(() => {
+        // Tarayıcı yine de kilitlerse sessiz devam et ama videoyu asla durdurma
         this.webrtcVideo.muted = true;
-        this.webrtcVideo.play().then(() => {
-          if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
-        }).catch(() => {});
+        this.webrtcVideo.play().catch(() => {});
       });
     }
   }
 
   async startScreenShare() {
     try {
-      // Sekme / Ekran + Ses Yakalama (60 FPS & Yüksek Kalite)
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           cursor: 'always',
@@ -169,14 +181,14 @@ class WebRTCShareEngine {
       this.localStream = stream;
       this.isSharing = true;
 
-      // 1. Oynatıcıyı canlı WebRTC moduna al
+      // Oynatıcıyı canlı WebRTC moduna al
       window.syncEngine.loadMedia({
         type: 'webrtc',
         url: 'screenshare-live',
         title: '📺 Canlı Ekran / Film Yayını'
       });
 
-      // Host'ta kendi video ekranını göster (Yankı yapmaması için Host'ta sessiz)
+      // Host tarafı: Kendi ekranını göster (Yankı önlemek için sessiz)
       this.webrtcVideo.srcObject = stream;
       this.webrtcVideo.muted = true;
       this.webrtcVideo.play().catch(() => {});
@@ -202,7 +214,7 @@ class WebRTCShareEngine {
         });
       }
 
-      window.showToast('🚀 Ekranınız canlı yayına geçti!');
+      window.showToast('🚀 Canlı ekran yayınınız başladı!');
     } catch (err) {
       console.warn('Ekran paylaşımı iptal edildi veya başlatılamadı:', err);
     }
@@ -214,7 +226,9 @@ class WebRTCShareEngine {
       this.localStream = null;
     }
 
-    this.peerConnections.forEach(pc => pc.close());
+    this.peerConnections.forEach(pc => {
+      try { pc.close(); } catch(e) {}
+    });
     this.peerConnections.clear();
 
     this.isSharing = false;
@@ -252,19 +266,10 @@ class WebRTCShareEngine {
       });
     }
 
-    // İzleyici tarafı: Gelen canlı akışı anında yakala ve ekrana yansıt
+    // İzleyici tarafı: Gelen canlı akışı anında yakala ve doğrudan oynat
     pc.ontrack = (event) => {
-      console.log('[WebRTC] Canlı yayın akışı yakalandı!', event);
-      let streamToPlay = null;
-      if (event.streams && event.streams[0]) {
-        streamToPlay = event.streams[0];
-      } else {
-        if (!this.webrtcVideo.srcObject) {
-          this.webrtcVideo.srcObject = new MediaStream();
-        }
-        this.webrtcVideo.srcObject.addTrack(event.track);
-        streamToPlay = this.webrtcVideo.srcObject;
-      }
+      console.log('[WebRTC] Canlı yayın akışı yakalandı:', event.streams);
+      const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
 
       window.syncEngine.loadMedia({
         type: 'webrtc',
@@ -277,24 +282,21 @@ class WebRTCShareEngine {
       const idleLayer = document.getElementById('idle-player-container');
       if (idleLayer) idleLayer.classList.add('hidden');
 
-      this.webrtcVideo.srcObject = streamToPlay;
+      this.webrtcVideo.srcObject = stream;
       
-      // Önce sessiz başlat (Tarayıcı güvenlik engeline takılmaz)
+      // Önce SESSİZ BAŞLAT (Böylece tüm tarayıcılarda anında görüntü açılır, asla siyah kalmaz!)
       this.webrtcVideo.muted = true;
-      const playPromise = this.webrtcVideo.play();
-      if (playPromise !== undefined) {
-        playPromise.then(() => {
-          // Başarılı oynatma: Sesi açmayı dene
-          this.webrtcVideo.muted = false;
-          window.syncEngine.applyVolume();
-          if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
-        }).catch(() => {
-          // Tarayıcı güvenlik engeli: Butonu göster
-          this.webrtcVideo.muted = true;
-          this.webrtcVideo.play().catch(() => {});
-          if (this.autoplayOverlay) this.autoplayOverlay.classList.remove('hidden');
-        });
-      }
+      this.webrtcVideo.play().then(() => {
+        // Görüntü ekrana geldi! Sesi açmayı dene
+        this.webrtcVideo.muted = false;
+        window.syncEngine.applyVolume();
+        if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
+      }).catch(() => {
+        // Eğer ses engellendiyse sessizce videoyu oynat ve butonla sesi açma seçeneği sun
+        this.webrtcVideo.muted = true;
+        this.webrtcVideo.play().catch(() => {});
+        if (this.autoplayOverlay) this.autoplayOverlay.classList.remove('hidden');
+      });
     };
 
     // ICE Adaylarını İlet
@@ -310,7 +312,7 @@ class WebRTCShareEngine {
 
     // Bağlantı durumunu izle
     pc.oniceconnectionstatechange = () => {
-      console.log(`[WebRTC] ICE Bağlantı Durumu (${peerId}):`, pc.iceConnectionState);
+      console.log(`[WebRTC] ICE Durumu (${peerId}):`, pc.iceConnectionState);
       if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
         if (isInitiator && typeof pc.restartIce === 'function') {
           pc.restartIce();
@@ -322,10 +324,7 @@ class WebRTCShareEngine {
     if (isInitiator) {
       setTimeout(async () => {
         try {
-          const offer = await pc.createOffer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: true
-          });
+          const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
           this.socket.emit('webrtc-signal', {
             targetId: peerId,
@@ -333,7 +332,7 @@ class WebRTCShareEngine {
             type: 'offer'
           });
         } catch (err) {
-          console.error('[WebRTC] Offer oluşturma hatası:', err);
+          console.error('[WebRTC] Offer hatası:', err);
         }
       }, 50);
     }
@@ -355,7 +354,7 @@ class WebRTCShareEngine {
         if (pc.iceCandidatesQueue && pc.iceCandidatesQueue.length > 0) {
           for (const cand of pc.iceCandidatesQueue) {
             try {
-              await pc.addIceCandidate(new RTCIceCandidate(cand));
+              await pc.addIceCandidate(cand);
             } catch(e) {}
           }
           pc.iceCandidatesQueue = [];
@@ -375,7 +374,7 @@ class WebRTCShareEngine {
           if (pc.iceCandidatesQueue && pc.iceCandidatesQueue.length > 0) {
             for (const cand of pc.iceCandidatesQueue) {
               try {
-                await pc.addIceCandidate(new RTCIceCandidate(cand));
+                await pc.addIceCandidate(cand);
               } catch(e) {}
             }
             pc.iceCandidatesQueue = [];
@@ -384,7 +383,7 @@ class WebRTCShareEngine {
       } else if (type === 'candidate') {
         if (pc.remoteDescription && pc.remoteDescription.type) {
           try {
-            await pc.addIceCandidate(new RTCIceCandidate(signal));
+            await pc.addIceCandidate(signal);
           } catch(e) {}
         } else {
           if (!pc.iceCandidatesQueue) pc.iceCandidatesQueue = [];
@@ -392,7 +391,7 @@ class WebRTCShareEngine {
         }
       }
     } catch (err) {
-      console.error('[WebRTC] Sinyal işleme hatası:', err);
+      console.error('[WebRTC] Sinyal hatası:', err);
     }
   }
 }
