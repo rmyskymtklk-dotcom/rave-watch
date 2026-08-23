@@ -889,6 +889,33 @@ html, body {
   animation: pulse-dot 1s infinite;
 }
 
+.webrtc-autoplay-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  cursor: pointer;
+}
+
+.webrtc-autoplay-overlay.hidden {
+  display: none !important;
+}
+
+.btn-resume-live {
+  font-size: 1.1rem;
+  padding: 0.9rem 1.8rem;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 30px var(--accent-red);
+  animation: pulse-slow 2s infinite alternate;
+}
+
 /* -------------------------------------------------------------
    UÇUŞAN RAVE REAKSİYONLARI (FLOATING EMOJIS)
    ------------------------------------------------------------- */

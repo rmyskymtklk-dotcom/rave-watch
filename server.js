@@ -532,10 +532,12 @@ io.on('connection', (socket) => {
 
     if (active) {
       room.media.type = 'webrtc';
-      room.media.title = '📺 Canlı Ekran / Sekme Yayını';
+      room.media.url = 'screenshare-live';
+      room.media.title = '📺 Canlı Ekran / Film Yayını';
     } else {
-      room.media.type = 'youtube';
-      room.media.title = 'YouTube';
+      room.media.type = 'idle';
+      room.media.url = '';
+      room.media.title = '🎬 Henüz bir video veya film seçilmedi';
     }
 
     io.to(currentRoomId).emit('screenshare-status-update', {
