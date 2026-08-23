@@ -156,18 +156,80 @@ class RoomEngine {
       });
     }
 
-    // Tam Ekran Butonu (Edge to Edge Fullscreen)
+    // Tam Ekran Yönetimi (PC, Android & iOS Safari Uyumlu)
+    const playerWrapper = document.getElementById('player-wrapper');
+    const toggleAppFullscreen = () => {
+      const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.body.classList.contains('mobile-pseudo-fullscreen');
+
+      if (!isFullscreen) {
+        if (playerWrapper.requestFullscreen) {
+          playerWrapper.requestFullscreen().then(() => {
+            if (screen.orientation && screen.orientation.lock) {
+              screen.orientation.lock('landscape').catch(() => {});
+            }
+          }).catch(() => {
+            this.triggerMobileVideoFullscreen();
+          });
+        } else if (playerWrapper.webkitRequestFullscreen) {
+          playerWrapper.webkitRequestFullscreen();
+        } else {
+          this.triggerMobileVideoFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+        document.body.classList.remove('mobile-pseudo-fullscreen');
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock().catch(() => {});
+        }
+      }
+    };
+
     const fsBtn = document.getElementById('ctrl-fullscreen');
     if (fsBtn) {
-      fsBtn.addEventListener('click', () => {
-        const playerWrapper = document.getElementById('player-wrapper');
-        if (!document.fullscreenElement) {
-          if (playerWrapper.requestFullscreen) playerWrapper.requestFullscreen();
-          else if (playerWrapper.webkitRequestFullscreen) playerWrapper.webkitRequestFullscreen();
-        } else {
-          if (document.exitFullscreen) document.exitFullscreen();
+      fsBtn.addEventListener('click', toggleAppFullscreen);
+    }
+
+    // Mobilde Videoya Çift Dokunarak Tam Ekran Yapma
+    let lastTap = 0;
+    playerWrapper.addEventListener('touchend', (e) => {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTap;
+      if (tapLength < 350 && tapLength > 0) {
+        e.preventDefault();
+        toggleAppFullscreen();
+      }
+      lastTap = currentTime;
+    });
+
+    // Telefonu Yatay Çevirince (Landscape) Otomatik Tam Ekrana Geçme
+    const handleDeviceOrientation = () => {
+      const isMobile = window.innerWidth <= 1024;
+      const isLandscape = window.innerWidth > window.innerHeight;
+
+      if (isMobile && isLandscape) {
+        document.body.classList.add('mobile-landscape-mode');
+        if (!document.fullscreenElement && playerWrapper.requestFullscreen) {
+          playerWrapper.requestFullscreen().catch(() => {});
         }
-      });
+      } else if (isMobile && !isLandscape) {
+        document.body.classList.remove('mobile-landscape-mode');
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+        document.body.classList.remove('mobile-pseudo-fullscreen');
+      }
+    };
+
+    window.addEventListener('resize', handleDeviceOrientation);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(handleDeviceOrientation, 250);
+    });
+    if (screen.orientation) {
+      screen.orientation.addEventListener('change', handleDeviceOrientation);
     }
 
     // Yeniden Eşitleme Butonu
@@ -448,6 +510,18 @@ class RoomEngine {
 
       container.appendChild(row);
     });
+  }
+
+  // iOS Safari & Mobil Video Tam Ekran Tetikleyicisi
+  triggerMobileVideoFullscreen() {
+    const currentType = window.syncEngine ? window.syncEngine.currentMediaType : 'youtube';
+    if (currentType === 'html5' && window.syncEngine.html5Video && window.syncEngine.html5Video.webkitEnterFullscreen) {
+      window.syncEngine.html5Video.webkitEnterFullscreen();
+    } else if (currentType === 'webrtc' && window.syncEngine.webrtcVideo && window.syncEngine.webrtcVideo.webkitEnterFullscreen) {
+      window.syncEngine.webrtcVideo.webkitEnterFullscreen();
+    } else {
+      document.body.classList.toggle('mobile-pseudo-fullscreen');
+    }
   }
 }
 

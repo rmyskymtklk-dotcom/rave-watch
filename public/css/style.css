@@ -1905,7 +1905,7 @@ input:checked + .slider:before {
 }
 
 /* -------------------------------------------------------------
-   RESPONSIVE UYUMLULUK
+   RESPONSIVE & MOBİL YATAY (LANDSCAPE) TAM EKRAN UYUMLULUĞU
    ------------------------------------------------------------- */
 @media (max-width: 900px) {
   .room-main-layout {
@@ -1925,4 +1925,68 @@ input:checked + .slider:before {
   .hero-title {
     font-size: 2rem;
   }
+}
+
+/* Mobil Telefon Yatay Çevrildiğinde (Landscape) Otomatik Tam Ekran */
+@media (max-width: 1024px) and (orientation: landscape) {
+  .room-header {
+    display: none !important;
+  }
+  .room-main-layout {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr !important;
+    height: 100vh !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .player-stage-container {
+    width: 100vw !important;
+    height: 100vh !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .player-wrapper {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+  }
+  .room-side-panel {
+    display: none !important;
+  }
+}
+
+/* Mobil iOS & Android Tam Ekran Modu */
+.mobile-pseudo-fullscreen {
+  overflow: hidden !important;
+}
+
+.mobile-pseudo-fullscreen .room-header,
+.mobile-pseudo-fullscreen .room-side-panel {
+  display: none !important;
+}
+
+.mobile-pseudo-fullscreen .room-main-layout {
+  grid-template-columns: 1fr !important;
+  grid-template-rows: 1fr !important;
+  height: 100vh !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.mobile-pseudo-fullscreen .player-stage-container {
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+.mobile-pseudo-fullscreen .player-wrapper {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 99999 !important;
+  border-radius: 0 !important;
+  background: #000 !important;
 }
