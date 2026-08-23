@@ -222,6 +222,7 @@
     document.getElementById('create-room-btn').addEventListener('click', () => {
       saveProfile();
       const code = generate4CharRoomCode();
+      sessionStorage.setItem('sync_room_host_' + code.toLowerCase(), 'true');
       window.location.href = `/room/${code}`;
     });
 

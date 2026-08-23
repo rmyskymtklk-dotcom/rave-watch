@@ -278,13 +278,20 @@ io.on('connection', (socket) => {
   });
 
   // Odaya Katılma / Oluşturma (Kalıcı Host Kimlik Kontrolü)
-  socket.on('join-room', ({ roomId, username, avatarColor, userToken }) => {
+  socket.on('join-room', ({ roomId, username, avatarColor, userToken, isCreator }) => {
     currentRoomId = roomId.trim().toLowerCase();
     const room = getOrCreateRoom(currentRoomId);
 
-    // Eğer bu token odanın kayıtlı Host'u ise veya oda yeni kuruluyorsa Host yap
+    // Host tespiti (F5 yenilemelerinde asla kaybolmaz)
     let isHost = false;
-    if (!room.hostToken || room.hostToken === userToken) {
+    if (room.hostToken && room.hostToken === userToken) {
+      room.hostId = socket.id;
+      isHost = true;
+      if (room.hostDisconnectTimer) {
+        clearTimeout(room.hostDisconnectTimer);
+        room.hostDisconnectTimer = null;
+      }
+    } else if (!room.hostToken || (isCreator && !room.hostId) || room.users.size === 0) {
       room.hostToken = userToken;
       room.hostId = socket.id;
       isHost = true;
@@ -292,10 +299,6 @@ io.on('connection', (socket) => {
         clearTimeout(room.hostDisconnectTimer);
         room.hostDisconnectTimer = null;
       }
-    } else if (room.users.size === 0 && !room.hostDisconnectTimer) {
-      room.hostToken = userToken;
-      room.hostId = socket.id;
-      isHost = true;
     }
 
     currentUser = {
@@ -308,6 +311,14 @@ io.on('connection', (socket) => {
 
     room.users.set(socket.id, currentUser);
     socket.join(currentRoomId);
+
+    // Eğer Host yeniden bağlandıysa tüm odaya teyit et
+    if (isHost) {
+      io.to(currentRoomId).emit('host-transferred', {
+        newHostId: socket.id,
+        newHostName: currentUser.username
+      });
+    }
 
     // Kullanıcıya mevcut oda durumunu gönder
     socket.emit('room-joined', {
