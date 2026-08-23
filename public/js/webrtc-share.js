@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * SYNCPARTY WEBRTC SCREEN & TAB AUDIO SHARING ENGINE
- * Kesintisiz Canlı Ekran & Film Yayını (Autoplay Korumalı, Anında Açılır)
+ * Kesintisiz 60 FPS Canlı Ekran & Film Yayını (Multi-Track & F5 Garantili)
  * ============================================================================
  */
 
@@ -9,6 +9,7 @@ class WebRTCShareEngine {
   constructor(socket) {
     this.socket = socket;
     this.localStream = null;
+    this.remoteStream = null;
     this.peerConnections = new Map(); // peerId -> RTCPeerConnection
     this.isSharing = false;
 
@@ -57,9 +58,13 @@ class WebRTCShareEngine {
       this.webrtcVideo.setAttribute('webkit-playsinline', '');
       this.webrtcVideo.playsInline = true;
       this.webrtcVideo.muted = true;
+      
+      this.webrtcVideo.addEventListener('loadedmetadata', () => {
+        this.webrtcVideo.play().catch(() => {});
+      });
     }
 
-    // "Yayını Başlat & Sesi Aç" Butonuna Basıldığında
+    // "Yayını Başlat & Sesi Aç" Butonu
     const handleUnmuteClick = (e) => {
       if (e) {
         e.preventDefault();
@@ -75,7 +80,7 @@ class WebRTCShareEngine {
       this.autoplayOverlay.addEventListener('click', handleUnmuteClick);
     }
 
-    // Video alanının herhangi bir yerine tıklandığında sesi aç
+    // Video sahnesinin herhangi bir yerine tıklandığında sesi aç
     const playerWrapper = document.getElementById('player-wrapper');
     if (playerWrapper) {
       playerWrapper.addEventListener('click', () => {
@@ -133,6 +138,11 @@ class WebRTCShareEngine {
           window.syncEngine.loadMedia(media);
           window.showToast('📺 Ekran yayını sonlandırıldı.');
           if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
+          if (this.remoteStream) {
+            this.remoteStream.getTracks().forEach(t => t.stop());
+            this.remoteStream = null;
+          }
+          if (this.webrtcVideo) this.webrtcVideo.srcObject = null;
         }
       }
     });
@@ -155,7 +165,6 @@ class WebRTCShareEngine {
       this.webrtcVideo.play().then(() => {
         window.syncEngine.applyVolume();
       }).catch(() => {
-        // Tarayıcı yine de kilitlerse sessiz devam et ama videoyu asla durdurma
         this.webrtcVideo.muted = true;
         this.webrtcVideo.play().catch(() => {});
       });
@@ -266,10 +275,26 @@ class WebRTCShareEngine {
       });
     }
 
-    // İzleyici tarafı: Gelen canlı akışı anında yakala ve doğrudan oynat
+    // İzleyici tarafı: Gelen CANLI video ve ses kanallarını birleştirip doğrudan ekrana yansıt
     pc.ontrack = (event) => {
-      console.log('[WebRTC] Canlı yayın akışı yakalandı:', event.streams);
-      const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+      console.log('[WebRTC] Canlı yayın kanalı yakalandı:', event.track.kind);
+
+      if (!this.remoteStream) {
+        this.remoteStream = new MediaStream();
+      }
+
+      // Gelen track'i (video veya audio) mevcut akışa ekle (Üzerine yazma hatası engellendi)
+      if (event.streams && event.streams[0]) {
+        event.streams[0].getTracks().forEach(track => {
+          if (!this.remoteStream.getTracks().some(t => t.id === track.id)) {
+            this.remoteStream.addTrack(track);
+          }
+        });
+      } else if (event.track) {
+        if (!this.remoteStream.getTracks().some(t => t.id === event.track.id)) {
+          this.remoteStream.addTrack(event.track);
+        }
+      }
 
       window.syncEngine.loadMedia({
         type: 'webrtc',
@@ -282,17 +307,17 @@ class WebRTCShareEngine {
       const idleLayer = document.getElementById('idle-player-container');
       if (idleLayer) idleLayer.classList.add('hidden');
 
-      this.webrtcVideo.srcObject = stream;
+      this.webrtcVideo.srcObject = this.remoteStream;
       
-      // Önce SESSİZ BAŞLAT (Böylece tüm tarayıcılarda anında görüntü açılır, asla siyah kalmaz!)
+      // Video ekranını hemen başlat
       this.webrtcVideo.muted = true;
       this.webrtcVideo.play().then(() => {
-        // Görüntü ekrana geldi! Sesi açmayı dene
+        // Canlı görüntü ekrana geldi, sesi açmayı dene
         this.webrtcVideo.muted = false;
         window.syncEngine.applyVolume();
         if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
       }).catch(() => {
-        // Eğer ses engellendiyse sessizce videoyu oynat ve butonla sesi açma seçeneği sun
+        // Tarayıcı kısıtlarsa sessizce görüntüyü ver
         this.webrtcVideo.muted = true;
         this.webrtcVideo.play().catch(() => {});
         if (this.autoplayOverlay) this.autoplayOverlay.classList.remove('hidden');
@@ -354,7 +379,7 @@ class WebRTCShareEngine {
         if (pc.iceCandidatesQueue && pc.iceCandidatesQueue.length > 0) {
           for (const cand of pc.iceCandidatesQueue) {
             try {
-              await pc.addIceCandidate(cand);
+              await pc.addIceCandidate(new RTCIceCandidate(cand));
             } catch(e) {}
           }
           pc.iceCandidatesQueue = [];
@@ -374,7 +399,7 @@ class WebRTCShareEngine {
           if (pc.iceCandidatesQueue && pc.iceCandidatesQueue.length > 0) {
             for (const cand of pc.iceCandidatesQueue) {
               try {
-                await pc.addIceCandidate(cand);
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
               } catch(e) {}
             }
             pc.iceCandidatesQueue = [];
@@ -383,7 +408,7 @@ class WebRTCShareEngine {
       } else if (type === 'candidate') {
         if (pc.remoteDescription && pc.remoteDescription.type) {
           try {
-            await pc.addIceCandidate(signal);
+            await pc.addIceCandidate(new RTCIceCandidate(signal));
           } catch(e) {}
         } else {
           if (!pc.iceCandidatesQueue) pc.iceCandidatesQueue = [];
