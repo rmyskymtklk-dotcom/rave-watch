@@ -56,6 +56,7 @@ class SyncEngine {
     this.initUI();
     this.initSocketEvents();
     this.setupVolume();
+    this.setupBackgroundPlayback();
   }
 
   // -----------------------------------------------------------
@@ -587,15 +588,101 @@ class SyncEngine {
     });
 
     this.socket.on('sync-force', ({ currentTime, isPlaying }) => {
-      this.seekTo(currentTime, false);
+      if (typeof currentTime === 'number') {
+        this.seekTo(currentTime, false);
+      }
       if (isPlaying) this.play(false);
       else this.pause(false);
+      window.showToast('⚡ Host ile anında eşitlendi!');
+    });
+
+    // Host için: İzleyici "Yeniden Eşitle" istediğinde milisaniyelik süreyi raporla
+    this.socket.on('host-ping-time-for-guest', ({ guestId }) => {
+      if (this.isHost) {
+        this.socket.emit('host-pong-time', {
+          guestId,
+          currentTime: this.getCurrentTime(),
+          isPlaying: this.getIsPlaying()
+        });
+      }
     });
 
     this.socket.on('settings-updated', (settings) => {
       this.hostOnlyControl = settings.hostOnlyControl;
       this.updateHostLockIndicator();
     });
+  }
+
+  // -----------------------------------------------------------
+  // MOBİL ARKA PLANDA ÇALMA VE KİLİT EKRANI (MediaSession & KeepAlive)
+  // -----------------------------------------------------------
+  setupBackgroundPlayback() {
+    // 1. MediaSession API (Android/iOS Kilit ekranı ve bildirim kontrolleri)
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.setActionHandler('play', () => this.play(true));
+        navigator.mediaSession.setActionHandler('pause', () => this.pause(true));
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+          if (details.seekTime !== undefined) this.seekTo(details.seekTime, true);
+        });
+      } catch(e) {}
+    }
+
+    // 2. Tarayıcı arka plana geçtiğinde / ekran kilitlendiğinde sesin kesilmesini önle
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        const isPlaying = this.getIsPlaying();
+        if (isPlaying) {
+          if (this.html5Video && this.html5Video.paused) {
+            this.html5Video.play().catch(() => {});
+          }
+          if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
+            this.ytPlayer.playVideo();
+          }
+          if (this.webrtcVideo && this.webrtcVideo.paused) {
+            this.webrtcVideo.play().catch(() => {});
+          }
+        }
+      }
+    });
+
+    // 3. Mobil ses oturumunu canlı tutma tetikleyicisi (Kullanıcı ilk tıkladığında başlar)
+    const unlockAudio = () => {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+          const ctx = new AudioContext();
+          if (ctx.state === 'suspended') ctx.resume();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          gain.gain.value = 0.0001; // Duyulmayacak arka plan sinyali (Sesi canlı tutar)
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(0);
+        }
+      } catch(e) {}
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    };
+
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+  }
+
+  updateMediaSession(title, isPlaying) {
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: title || 'SyncParty Yayını',
+          artist: 'SyncParty Birlikte İzle',
+          album: 'Canlı Yayın',
+          artwork: [
+            { src: 'https://cdn-icons-png.flaticon.com/512/3845/3845868.png', sizes: '512x512', type: 'image/png' }
+          ]
+        });
+        navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+      } catch(e) {}
+    }
   }
 
   setHost(isHost) {

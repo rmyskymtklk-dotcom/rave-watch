@@ -398,6 +398,42 @@ io.on('connection', (socket) => {
     }
   });
 
+  // İzleyici "Host İle Yeniden Eşitle" İstediğinde (Anında Eşitleme)
+  socket.on('host-action', ({ action }) => {
+    if (!currentRoomId) return;
+    const room = rooms.get(currentRoomId);
+    if (!room) return;
+
+    if (action === 'request-sync') {
+      let liveTime = room.media.currentTime;
+      if (room.media.isPlaying && room.media.lastUpdated) {
+        const elapsed = (Date.now() - room.media.lastUpdated) / 1000;
+        liveTime += elapsed;
+      }
+
+      // 1. Sunucu hesapladığı tahmini süreyi anında izleyiciye iletir (Gecikmesiz)
+      socket.emit('sync-force', {
+        currentTime: liveTime,
+        isPlaying: room.media.isPlaying,
+        media: room.media
+      });
+
+      // 2. Host'tan tam milisaniyelik anlık süreyi çekip izleyiciye basar
+      if (room.hostId && room.hostId !== socket.id) {
+        io.to(room.hostId).emit('host-ping-time-for-guest', { guestId: socket.id });
+      }
+    }
+  });
+
+  socket.on('host-pong-time', ({ guestId, currentTime, isPlaying }) => {
+    if (guestId) {
+      io.to(guestId).emit('sync-force', {
+        currentTime,
+        isPlaying
+      });
+    }
+  });
+
   // Oda Ayarı Değiştirme (Host Only Kontrol Aç/Kapa)
   socket.on('toggle-host-control', ({ hostOnlyControl }) => {
     if (!currentRoomId) return;
