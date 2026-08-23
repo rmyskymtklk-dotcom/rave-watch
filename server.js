@@ -480,6 +480,15 @@ io.on('connection', (socket) => {
     });
   });
 
+  // İzleyici Ekran Akışını Talep Ettiğinde (Yeniden Bağlantı Garantisi)
+  socket.on('request-screenshare-stream', () => {
+    if (!currentRoomId) return;
+    const room = rooms.get(currentRoomId);
+    if (room && room.hostId && room.hostId !== socket.id) {
+      io.to(room.hostId).emit('guest-requested-screenshare', { guestId: socket.id });
+    }
+  });
+
   // Ayrılma & Bağlantı Kopması
   socket.on('disconnect', () => {
     clearInterval(heartbeatInterval);
