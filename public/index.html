@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncParty - Birlikte İzle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/animations.css">
+</head>
+<body class="lobby-body">
+  <!-- Arka Plan Koyu Efektleri -->
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+
+  <!-- Üst Bar -->
+  <header class="lobby-header">
+    <div class="brand">
+      <div class="brand-icon">
+        <i class="fa-solid fa-bolt"></i>
+      </div>
+      <div class="brand-text">
+        <span class="brand-title">SYNC<span class="brand-accent">PARTY</span></span>
+      </div>
+    </div>
+    
+    <div class="header-right">
+      <!-- Dark Mode Switcher -->
+      <button class="btn-theme-toggle" id="theme-toggle-btn" title="Koyu / OLED Mod Değiştir">
+        <i class="fa-solid fa-moon" id="theme-icon"></i>
+        <span id="theme-text">OLED Mod</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ana İçerik -->
+  <main class="lobby-container">
+    <div class="lobby-hero">
+      <h1 class="hero-title">
+        Arkadaşlarınla <span class="gradient-text">Aynı Anda</span> İzle
+      </h1>
+    </div>
+
+    <!-- Giriş ve Oda Kartı -->
+    <div class="lobby-card glass-panel">
+      <!-- Kullanıcı Profili Ayarı -->
+      <div class="section-block">
+        <label class="input-label"><i class="fa-solid fa-user-astronaut"></i> Kullanıcı Adınız</label>
+        <div class="input-group">
+          <input type="text" id="username-input" class="cyber-input" placeholder="Örn: İzleyici" maxlength="20">
+          <button class="btn-icon" id="random-name-btn" title="Rastgele İsim Üret">
+            <i class="fa-solid fa-dice"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Canlı Renk Teması Seçimi -->
+      <div class="section-block">
+        <label class="input-label"><i class="fa-solid fa-palette"></i> Renk Teması Seçin (Anında Değişir)</label>
+        <div class="color-picker-row">
+          <div class="color-dot active" data-color="#b3001e" title="Koyu Kırmızı" style="background-color: #b3001e;"></div>
+          <div class="color-dot" data-color="#8b0018" title="Derin Bordo" style="background-color: #8b0018;"></div>
+          <div class="color-dot" data-color="#d90429" title="Yakut Kırmızı" style="background-color: #d90429;"></div>
+          <div class="color-dot" data-color="#7928ca" title="Neon Mor" style="background-color: #7928ca;"></div>
+          <div class="color-dot" data-color="#00f2fe" title="Siber Mavi" style="background-color: #00f2fe;"></div>
+          <div class="color-dot" data-color="#ff9900" title="Altın Turuncu" style="background-color: #ff9900;"></div>
+          <div class="color-dot" data-color="#10b981" title="Zümrüt Yeşil" style="background-color: #10b981;"></div>
+        </div>
+      </div>
+
+      <div class="divider-line">
+        <span>BİR ODA SEÇİN</span>
+      </div>
+
+      <!-- Oda Oluştur veya Katıl -->
+      <div class="lobby-actions-grid">
+        <!-- Oda Oluştur -->
+        <div class="action-box">
+          <div class="action-icon red-glow-icon">
+            <i class="fa-solid fa-plus"></i>
+          </div>
+          <h3 class="action-title">Yeni Oda Oluştur</h3>
+          <p class="action-desc">4 Haneli (2 Harf + 2 Sayı) özel oda oluşturun.</p>
+          <button class="cyber-btn btn-primary" id="create-room-btn">
+            <i class="fa-solid fa-play"></i> Hemen Başlat
+          </button>
+        </div>
+
+        <!-- Odaya Katıl -->
+        <div class="action-box">
+          <div class="action-icon blue-glow-icon">
+            <i class="fa-solid fa-right-to-bracket"></i>
+          </div>
+          <h3 class="action-title">Odaya Katıl</h3>
+          <p class="action-desc">Arkadaşınızın 4 haneli oda kodunu girin.</p>
+          <div class="input-group">
+            <input type="text" id="room-code-input" class="cyber-input code-input" placeholder="Kod (Örn: AB42)" maxlength="8" style="text-transform: uppercase;">
+            <button class="cyber-btn btn-secondary" id="join-room-btn">
+              <i class="fa-solid fa-arrow-right"></i> Katıl
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="lobby-footer">
+    <p>SyncParty © 2026 • Senkronize Birlikte İzleme</p>
+  </footer>
+
+  <script>
+    // Dinamik Tema Renk Paletleri
+    const themePalettes = {
+      '#b3001e': { red: '#b3001e', crimson: '#8b0018', glow: 'rgba(179, 0, 30, 0.45)', border: 'rgba(179, 0, 30, 0.35)' },
+      '#8b0018': { red: '#8b0018', crimson: '#5c000e', glow: 'rgba(139, 0, 24, 0.45)', border: 'rgba(139, 0, 24, 0.35)' },
+      '#d90429': { red: '#d90429', crimson: '#a0001e', glow: 'rgba(217, 4, 41, 0.45)', border: 'rgba(217, 4, 41, 0.35)' },
+      '#7928ca': { red: '#7928ca', crimson: '#551199', glow: 'rgba(121, 40, 202, 0.45)', border: 'rgba(121, 40, 202, 0.35)' },
+      '#00f2fe': { red: '#00f2fe', crimson: '#00a3cc', glow: 'rgba(0, 242, 254, 0.45)', border: 'rgba(0, 242, 254, 0.35)' },
+      '#ff9900': { red: '#ff9900', crimson: '#cc7a00', glow: 'rgba(255, 153, 0, 0.45)', border: 'rgba(255, 153, 0, 0.35)' },
+      '#10b981': { red: '#10b981', crimson: '#059669', glow: 'rgba(16, 185, 129, 0.45)', border: 'rgba(16, 185, 129, 0.35)' }
+    };
+
+    function applyAccentColor(hex) {
+      const p = themePalettes[hex] || themePalettes['#b3001e'];
+      document.documentElement.style.setProperty('--accent-red', p.red);
+      document.documentElement.style.setProperty('--accent-crimson', p.crimson);
+      document.documentElement.style.setProperty('--accent-red-glow', p.glow);
+      document.documentElement.style.setProperty('--border-red', p.border);
+      document.documentElement.style.setProperty('--border-red-active', p.red);
+      localStorage.setItem('sync_color', hex);
+      localStorage.setItem('sync_accent_color', hex);
+    }
+
+    // 4 Haneli Oda Kodu Üretici (2 Harf + 2 Rakam)
+    function generate4CharRoomCode() {
+      const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+      const numbers = '0123456789';
+      const l1 = letters[Math.floor(Math.random() * letters.length)];
+      const l2 = letters[Math.floor(Math.random() * letters.length)];
+      const n1 = numbers[Math.floor(Math.random() * numbers.length)];
+      const n2 = numbers[Math.floor(Math.random() * numbers.length)];
+      return `${l1}${l2}${n1}${n2}`;
+    }
+
+    // Dark Mode / OLED Mod Yönetimi
+    const themeToggleBtn = document.getElementById('theme-toggle-btn');
+    const themeIcon = document.getElementById('theme-icon');
+    const themeText = document.getElementById('theme-text');
+
+    function applyTheme(isOled) {
+      if (isOled) {
+        document.body.classList.add('theme-oled');
+        themeIcon.className = 'fa-solid fa-sun';
+        themeText.textContent = 'Standart Koyu';
+        localStorage.setItem('sync_theme', 'oled');
+      } else {
+        document.body.classList.remove('theme-oled');
+        themeIcon.className = 'fa-solid fa-moon';
+        themeText.textContent = 'OLED Mod';
+        localStorage.setItem('sync_theme', 'midnight');
+      }
+    }
+
+    const savedTheme = localStorage.getItem('sync_theme') === 'oled';
+    applyTheme(savedTheme);
+
+    themeToggleBtn.addEventListener('click', () => {
+      const isOled = !document.body.classList.contains('theme-oled');
+      applyTheme(isOled);
+    });
+
+    // İsim Üreteci
+    const adjectives = ['Hızlı', 'Süper', 'Gece', 'Kırmızı', 'Cyber', 'Neon', 'Mega', 'Kral', 'Alpha'];
+    const nouns = ['İzleyici', 'Korsan', 'Seyirci', 'Kullanıcı', 'Sinemacı', 'Yayıncı', 'Dost'];
+    
+    function generateRandomName() {
+      const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+      const noun = nouns[Math.floor(Math.random() * nouns.length)];
+      const num = Math.floor(10 + Math.random() * 90);
+      return `${adj}${noun}${num}`;
+    }
+
+    const usernameInput = document.getElementById('username-input');
+    const randomNameBtn = document.getElementById('random-name-btn');
+    const colorDots = document.querySelectorAll('.color-dot');
+    let selectedColor = localStorage.getItem('sync_color') || '#b3001e';
+
+    const savedName = localStorage.getItem('sync_username');
+    if (savedName) usernameInput.value = savedName;
+    else usernameInput.value = generateRandomName();
+
+    // Kayıtlı rengi uygula ve aktif yap
+    applyAccentColor(selectedColor);
+    colorDots.forEach(dot => {
+      dot.classList.toggle('active', dot.dataset.color === selectedColor);
+    });
+
+    randomNameBtn.addEventListener('click', () => {
+      usernameInput.value = generateRandomName();
+    });
+
+    colorDots.forEach(dot => {
+      dot.addEventListener('click', () => {
+        colorDots.forEach(d => d.classList.remove('active'));
+        dot.classList.add('active');
+        selectedColor = dot.dataset.color;
+        applyAccentColor(selectedColor);
+      });
+    });
+
+    function saveProfile() {
+      const username = usernameInput.value.trim() || generateRandomName();
+      localStorage.setItem('sync_username', username);
+      localStorage.setItem('sync_color', selectedColor);
+      return { username, selectedColor };
+    }
+
+    // Yeni 4 Haneli Oda Başlat
+    document.getElementById('create-room-btn').addEventListener('click', () => {
+      saveProfile();
+      const code = generate4CharRoomCode();
+      window.location.href = `/room/${code}`;
+    });
+
+    // Odaya Katıl
+    document.getElementById('join-room-btn').addEventListener('click', () => {
+      saveProfile();
+      const code = document.getElementById('room-code-input').value.trim().toUpperCase();
+      if (!code) {
+        alert('Lütfen geçerli bir oda kodu girin!');
+        return;
+      }
+      let cleanCode = code;
+      if (cleanCode.includes('/ROOM/')) {
+        cleanCode = cleanCode.split('/ROOM/')[1];
+      }
+      cleanCode = cleanCode.replace(/[^A-Z0-9_-]/gi, '');
+      window.location.href = `/room/${cleanCode}`;
+    });
+
+    document.getElementById('room-code-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('join-room-btn').click();
+      }
+    });
+  </script>
+</body>
+</html>

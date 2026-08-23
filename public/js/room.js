@@ -1,0 +1,451 @@
+/**
+ * ============================================================================
+ * SYNCPARTY ROOM CONTROLLER (ANA ODA YÖNETİCİSİ)
+ * ============================================================================
+ */
+
+// Dinamik Tema Renk Paletleri
+const themePalettes = {
+  '#b3001e': { red: '#b3001e', crimson: '#8b0018', glow: 'rgba(179, 0, 30, 0.45)', border: 'rgba(179, 0, 30, 0.35)' },
+  '#8b0018': { red: '#8b0018', crimson: '#5c000e', glow: 'rgba(139, 0, 24, 0.45)', border: 'rgba(139, 0, 24, 0.35)' },
+  '#d90429': { red: '#d90429', crimson: '#a0001e', glow: 'rgba(217, 4, 41, 0.45)', border: 'rgba(217, 4, 41, 0.35)' },
+  '#7928ca': { red: '#7928ca', crimson: '#551199', glow: 'rgba(121, 40, 202, 0.45)', border: 'rgba(121, 40, 202, 0.35)' },
+  '#00f2fe': { red: '#00f2fe', crimson: '#00a3cc', glow: 'rgba(0, 242, 254, 0.45)', border: 'rgba(0, 242, 254, 0.35)' },
+  '#ff9900': { red: '#ff9900', crimson: '#cc7a00', glow: 'rgba(255, 153, 0, 0.45)', border: 'rgba(255, 153, 0, 0.35)' },
+  '#10b981': { red: '#10b981', crimson: '#059669', glow: 'rgba(16, 185, 129, 0.45)', border: 'rgba(16, 185, 129, 0.35)' }
+};
+
+function applyAccentColor(hex) {
+  const p = themePalettes[hex] || themePalettes['#b3001e'];
+  document.documentElement.style.setProperty('--accent-red', p.red);
+  document.documentElement.style.setProperty('--accent-crimson', p.crimson);
+  document.documentElement.style.setProperty('--accent-red-glow', p.glow);
+  document.documentElement.style.setProperty('--border-red', p.border);
+  document.documentElement.style.setProperty('--border-red-active', p.red);
+  localStorage.setItem('sync_accent_color', hex);
+}
+
+// Toast Bildirim Fonksiyonu
+window.showToast = function(message) {
+  const toast = document.getElementById('room-toast');
+  const toastText = document.getElementById('toast-text');
+  if (toast && toastText) {
+    toastText.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(window._toastTimer);
+    window._toastTimer = setTimeout(() => {
+      toast.classList.remove('show');
+    }, 3500);
+  }
+};
+
+class RoomEngine {
+  constructor() {
+    this.socket = io({
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000
+    });
+
+    this.roomId = this.getRoomIdFromUrl();
+    this.currentUser = null;
+    this.users = [];
+    this.isHost = false;
+    this.isFitFill = false;
+
+    // Alt Motorlar
+    window.syncEngine = new SyncEngine(this.socket);
+    window.chatEngine = new ChatEngine(this.socket);
+    window.webrtcEngine = new WebRTCShareEngine(this.socket);
+
+    this.init();
+    this.initTheme();
+  }
+
+  getRoomIdFromUrl() {
+    const pathParts = window.location.pathname.split('/');
+    let roomId = pathParts[pathParts.length - 1];
+    if (!roomId || roomId === 'room.html' || roomId === 'room') {
+      const urlParams = new URLSearchParams(window.location.search);
+      roomId = urlParams.get('room') || 'AB42';
+    }
+    return roomId.toUpperCase();
+  }
+
+  initTheme() {
+    const savedTheme = localStorage.getItem('sync_theme');
+    if (savedTheme === 'oled') {
+      document.body.classList.add('theme-oled');
+    }
+
+    const savedAccent = localStorage.getItem('sync_accent_color') || localStorage.getItem('sync_color') || '#b3001e';
+    applyAccentColor(savedAccent);
+
+    // Oda içi tema değiştirme butonu
+    const themeToggleBtn = document.getElementById('btn-theme-toggle');
+    if (themeToggleBtn) {
+      themeToggleBtn.addEventListener('click', () => {
+        const isOled = document.body.classList.toggle('theme-oled');
+        localStorage.setItem('sync_theme', isOled ? 'oled' : 'midnight');
+        window.showToast(isOled ? '🌑 OLED Saf Siyah Modu Aktif' : '✨ Standart Koyu Mod Aktif');
+      });
+    }
+
+    // Modal içi renk seçimi
+    const colorDots = document.querySelectorAll('#room-color-picker .color-dot');
+    colorDots.forEach(dot => {
+      dot.classList.toggle('active', dot.dataset.color === savedAccent);
+      dot.addEventListener('click', () => {
+        colorDots.forEach(d => d.classList.remove('active'));
+        dot.classList.add('active');
+        applyAccentColor(dot.dataset.color);
+        window.showToast(`🎨 Tema Rengi Değiştirildi`);
+      });
+    });
+  }
+
+  init() {
+    // 15sn Kopma Önleyici Heartbeat Dinleyicisi
+    this.socket.on('heartbeat-ping', () => {
+      this.socket.emit('heartbeat-pong');
+    });
+
+    // Odaya Bağlanma
+    const username = localStorage.getItem('sync_username') || `İzleyici ${Math.floor(10 + Math.random() * 90)}`;
+    const avatarColor = localStorage.getItem('sync_accent_color') || localStorage.getItem('sync_color') || '#b3001e';
+
+    this.socket.emit('join-room', {
+      roomId: this.roomId,
+      username,
+      avatarColor
+    });
+
+    document.getElementById('display-room-code').textContent = this.roomId;
+
+    // Davet Bağlantısı Kopyalama
+    document.getElementById('btn-copy-link').addEventListener('click', () => {
+      const inviteUrl = window.location.href;
+      navigator.clipboard.writeText(inviteUrl).then(() => {
+        window.showToast('📋 Davet bağlantısı kopyalandı!');
+      }).catch(() => {
+        window.showToast('Link: ' + inviteUrl);
+      });
+    });
+
+    // Ekranı Tam Doldurma / Boşluk Doldur Butonu (Fill / Contain Toggle)
+    const fitBtn = document.getElementById('btn-toggle-fit');
+    if (fitBtn) {
+      fitBtn.addEventListener('click', () => {
+        const playerWrapper = document.getElementById('player-wrapper');
+        this.isFitFill = !this.isFitFill;
+        if (this.isFitFill) {
+          playerWrapper.classList.add('fill-screen-mode');
+          window.showToast('📐 Ekran Tam Alana Dolduruldu (Boşluksuz)');
+        } else {
+          playerWrapper.classList.remove('fill-screen-mode');
+          window.showToast('📏 Orijinal En-Boy Oranına Dönüldü');
+        }
+      });
+    }
+
+    // Tam Ekran Butonu (Edge to Edge Fullscreen)
+    const fsBtn = document.getElementById('ctrl-fullscreen');
+    if (fsBtn) {
+      fsBtn.addEventListener('click', () => {
+        const playerWrapper = document.getElementById('player-wrapper');
+        if (!document.fullscreenElement) {
+          if (playerWrapper.requestFullscreen) playerWrapper.requestFullscreen();
+          else if (playerWrapper.webkitRequestFullscreen) playerWrapper.webkitRequestFullscreen();
+        } else {
+          if (document.exitFullscreen) document.exitFullscreen();
+        }
+      });
+    }
+
+    // Yeniden Eşitleme Butonu
+    document.getElementById('btn-re-sync').addEventListener('click', () => {
+      if (!this.isHost) {
+        window.showToast('🔄 Host ile anında yeniden eşitleniyor...');
+        this.socket.emit('host-action', { action: 'request-sync' });
+      } else {
+        window.showToast('👑 Siz oda sahibisiniz, yayın kaynağı sizsiniz.');
+      }
+    });
+
+    // Yan Panel Sekme Değişimi
+    const tabChatBtn = document.getElementById('tab-chat-btn');
+    const tabUsersBtn = document.getElementById('tab-users-btn');
+    const chatTab = document.getElementById('chat-tab');
+    const usersTab = document.getElementById('users-tab');
+
+    tabChatBtn.addEventListener('click', () => {
+      tabChatBtn.classList.add('active');
+      tabUsersBtn.classList.remove('active');
+      chatTab.classList.remove('hidden');
+      usersTab.classList.add('hidden');
+    });
+
+    tabUsersBtn.addEventListener('click', () => {
+      tabUsersBtn.classList.add('active');
+      tabChatBtn.classList.remove('active');
+      usersTab.classList.remove('hidden');
+      chatTab.classList.add('hidden');
+    });
+
+    document.getElementById('users-toggle-btn').addEventListener('click', () => {
+      tabUsersBtn.click();
+    });
+
+    // Medya ve Ayar Modalları
+    this.initMediaModal();
+    this.initSettingsModal();
+    this.initSocketEvents();
+  }
+
+  // -----------------------------------------------------------
+  // MEDYA SEÇİM MODALI (YouTube, Film Proxy, MP4/M3U8)
+  // -----------------------------------------------------------
+  initMediaModal() {
+    const mediaModal = document.getElementById('media-modal');
+    const openModalBtn = document.getElementById('btn-open-media-modal');
+    const closeModalBtn = document.getElementById('close-media-modal');
+    const cancelModalBtn = document.getElementById('cancel-media-modal');
+    const applyMediaBtn = document.getElementById('apply-media-btn');
+
+    openModalBtn.addEventListener('click', () => {
+      if (!this.isHost && window.syncEngine.hostOnlyControl) {
+        window.showToast('🔒 Yalnızca oda sahibi video kaynağını değiştirebilir!');
+        return;
+      }
+      mediaModal.classList.remove('hidden');
+    });
+
+    const hideModal = () => mediaModal.classList.add('hidden');
+    closeModalBtn.addEventListener('click', hideModal);
+    cancelModalBtn.addEventListener('click', hideModal);
+
+    // Modal Sekmeleri Değişimi
+    const modalTabBtns = document.querySelectorAll('.m-tab-btn');
+    const forms = {
+      youtube: document.getElementById('source-form-youtube'),
+      film: document.getElementById('source-form-film'),
+      direct: document.getElementById('source-form-direct'),
+      screenshare: document.getElementById('source-form-screenshare')
+    };
+
+    let selectedSource = 'youtube';
+
+    modalTabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        modalTabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedSource = btn.dataset.source;
+
+        Object.keys(forms).forEach(key => {
+          if (key === selectedSource) forms[key].classList.remove('hidden');
+          else forms[key].classList.add('hidden');
+        });
+      });
+    });
+
+    // Örnek YouTube Butonları
+    document.querySelectorAll('.chip-sample').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.getElementById('input-yt-url').value = chip.dataset.url;
+      });
+    });
+
+    // Modal Ekran Paylaşımı Başlat
+    document.getElementById('btn-start-modal-screenshare').addEventListener('click', () => {
+      hideModal();
+      window.webrtcEngine.startScreenShare();
+    });
+
+    // Medya Uygula Butonu
+    applyMediaBtn.addEventListener('click', async () => {
+      let type = selectedSource;
+      let url = '';
+      let title = '';
+
+      if (type === 'youtube') {
+        url = document.getElementById('input-yt-url').value.trim();
+        title = 'YouTube Videosu';
+      } else if (type === 'film') {
+        url = document.getElementById('input-film-url').value.trim();
+        title = '🎬 Film / Dizi Yayını';
+
+        window.showToast('🔍 Film akışı taranıyor ve optimize ediliyor...');
+
+        // Otomatik Video Kaynağı Çıkarma Denemesi
+        try {
+          const res = await fetch(`/api/extract-video?url=${encodeURIComponent(url)}`);
+          const check = await res.json();
+          if (check.success && check.streamUrl) {
+            type = 'html5';
+            url = check.streamUrl;
+            title = '🎬 Doğrudan Film Akışı';
+          } else {
+            type = 'embed';
+          }
+        } catch (e) {
+          type = 'embed';
+        }
+      } else if (type === 'direct') {
+        type = 'html5';
+        url = document.getElementById('input-direct-url').value.trim();
+        title = 'Doğrudan Video Akışı';
+      }
+
+      if (!url && type !== 'screenshare') {
+        alert('Lütfen geçerli bir bağlantı adresi girin!');
+        return;
+      }
+
+      this.socket.emit('change-media', { type, url, title });
+      hideModal();
+    });
+  }
+
+  // -----------------------------------------------------------
+  // ODA AYARLARI MODALI
+  // -----------------------------------------------------------
+  initSettingsModal() {
+    const settingsModal = document.getElementById('settings-modal');
+    const openSettingsBtn = document.getElementById('btn-room-settings');
+    const closeSettingsBtn = document.getElementById('close-settings-modal');
+    const saveSettingsBtn = document.getElementById('save-settings-btn');
+    const hostLockCheck = document.getElementById('setting-host-lock');
+    const oledModeCheck = document.getElementById('setting-oled-mode');
+
+    openSettingsBtn.addEventListener('click', () => {
+      oledModeCheck.checked = document.body.classList.contains('theme-oled');
+      settingsModal.classList.remove('hidden');
+    });
+
+    const hide = () => settingsModal.classList.add('hidden');
+    closeSettingsBtn.addEventListener('click', hide);
+
+    saveSettingsBtn.addEventListener('click', () => {
+      if (this.isHost) {
+        this.socket.emit('toggle-host-control', {
+          hostOnlyControl: hostLockCheck.checked
+        });
+      }
+      
+      if (oledModeCheck.checked) {
+        document.body.classList.add('theme-oled');
+        localStorage.setItem('sync_theme', 'oled');
+      } else {
+        document.body.classList.remove('theme-oled');
+        localStorage.setItem('sync_theme', 'midnight');
+      }
+
+      hide();
+      window.showToast('⚙️ Ayarlar kaydedildi.');
+    });
+  }
+
+  // -----------------------------------------------------------
+  // SOCKET.IO ODA YÖNETİMİ
+  // -----------------------------------------------------------
+  initSocketEvents() {
+    this.socket.on('room-joined', (data) => {
+      this.currentUser = data.user;
+      this.isHost = data.user.id === data.hostId;
+      this.users = data.users;
+
+      window.syncEngine.setHost(this.isHost);
+      this.updateHostStatusUI();
+      this.renderUsersList();
+
+      // Medyayı yükle
+      if (data.media && data.media.url) {
+        window.syncEngine.loadMedia(data.media);
+      }
+
+      window.showToast(this.isHost ? '👑 Odanın sahibisiniz!' : '🎉 Odaya katıldınız!');
+    });
+
+    this.socket.on('user-joined', ({ user, users }) => {
+      this.users = users;
+      this.renderUsersList();
+      window.showToast(`👋 ${user.username} odaya katıldı.`);
+    });
+
+    this.socket.on('user-left', ({ userId, users }) => {
+      this.users = users;
+      this.renderUsersList();
+    });
+
+    this.socket.on('host-transferred', ({ newHostId, newHostName }) => {
+      this.isHost = this.socket.id === newHostId;
+      window.syncEngine.setHost(this.isHost);
+      this.updateHostStatusUI();
+      window.showToast(`👑 Yeni oda sahibi: ${newHostName}`);
+    });
+
+    this.socket.on('action-error', ({ message }) => {
+      window.showToast(`⚠️ ${message}`);
+    });
+  }
+
+  updateHostStatusUI() {
+    const indicator = document.getElementById('host-status-indicator');
+
+    if (this.isHost) {
+      indicator.className = 'status-pill is-host';
+      indicator.innerHTML = `<i class="fa-solid fa-crown"></i> <span id="role-text">Oda Sahibi (Host)</span>`;
+    } else {
+      indicator.className = 'status-pill';
+      indicator.innerHTML = `<i class="fa-solid fa-shield"></i> <span id="role-text">İzleyici Modu</span>`;
+    }
+  }
+
+  renderUsersList() {
+    const container = document.getElementById('users-list-container');
+    const userCountDisplay = document.getElementById('user-count-display');
+    const tabUsersCount = document.getElementById('tab-users-count');
+
+    userCountDisplay.textContent = this.users.length;
+    tabUsersCount.textContent = this.users.length;
+
+    container.innerHTML = '';
+
+    this.users.forEach(user => {
+      const row = document.createElement('div');
+      row.className = 'user-row';
+
+      const left = document.createElement('div');
+      left.className = 'user-info-left';
+
+      const avatar = document.createElement('div');
+      avatar.className = 'user-avatar-circle';
+      avatar.style.backgroundColor = user.avatarColor || '#b3001e';
+      avatar.textContent = user.username.charAt(0).toUpperCase();
+
+      const name = document.createElement('span');
+      name.className = 'user-name-label';
+      name.textContent = user.username + (user.id === this.socket.id ? ' (Siz)' : '');
+
+      left.appendChild(avatar);
+      left.appendChild(name);
+      row.appendChild(left);
+
+      if (user.isHost) {
+        const hostBadge = document.createElement('span');
+        hostBadge.className = 'user-badge-host';
+        hostBadge.innerHTML = '<i class="fa-solid fa-crown"></i> HOST';
+        row.appendChild(hostBadge);
+      }
+
+      container.appendChild(row);
+    });
+  }
+}
+
+// Uygulama Başlatıcı
+document.addEventListener('DOMContentLoaded', () => {
+  window.roomEngine = new RoomEngine();
+});

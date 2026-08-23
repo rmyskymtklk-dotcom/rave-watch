@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncParty Room - Birlikte İzle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/animations.css">
+
+  <!-- HLS.js (M3U8 Canlı Yayın & Stream Desteği) -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <!-- Socket.IO İstemcisi -->
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="room-body">
+  <!-- Arka Plan Koyu Efektleri -->
+  <div class="bg-glow bg-glow-room"></div>
+
+  <!-- Üst Başlık & Kontrol Çubuğu -->
+  <header class="room-header">
+    <div class="header-left">
+      <a href="/" class="brand-mini">
+        <div class="brand-icon-mini"><i class="fa-solid fa-bolt"></i></div>
+        <span class="brand-title-mini">SYNC<span class="brand-accent">PARTY</span></span>
+      </a>
+      
+      <div class="room-code-badge" id="room-code-badge">
+        <span class="code-label">ODA:</span>
+        <span class="code-val" id="display-room-code">...</span>
+        <button class="btn-copy-code" id="btn-copy-link" title="Davet Bağlantısını Kopyala">
+          <i class="fa-regular fa-copy"></i>
+          <span class="tooltip">Kopyala</span>
+        </button>
+      </div>
+
+      <div class="status-pill" id="host-status-indicator">
+        <i class="fa-solid fa-shield"></i>
+        <span id="role-text">İzleyici Modu</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <!-- Medya Değiştir Butonu -->
+      <button class="cyber-btn btn-primary-sm" id="btn-open-media-modal">
+        <i class="fa-solid fa-film"></i>
+        <span>Video / Film Seç</span>
+      </button>
+
+      <!-- WebRTC Ekran Paylaşım Butonu -->
+      <button class="cyber-btn btn-secondary-sm" id="btn-screen-share">
+        <i class="fa-solid fa-display"></i>
+        <span id="screen-share-btn-text">Ekran Paylaş</span>
+      </button>
+
+      <!-- OLED / Dark Mode Butonu -->
+      <button class="btn-icon-header" id="btn-theme-toggle" title="OLED / Koyu Mod">
+        <i class="fa-solid fa-moon" id="room-theme-icon"></i>
+      </button>
+
+      <!-- Çevrimiçi Kullanıcılar -->
+      <div class="online-users-badge" id="users-toggle-btn" title="Katılımcı Listesi">
+        <i class="fa-solid fa-users"></i>
+        <span id="user-count-display">1</span>
+      </div>
+
+      <!-- Ayarlar -->
+      <button class="btn-icon-header" id="btn-room-settings" title="Oda Ayarları">
+        <i class="fa-solid fa-sliders"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ana Çalışma Alanı: Sol Medya Oynatıcı, Sağ Chat -->
+  <div class="room-main-layout">
+    <!-- Sol Taraf: Video Sahnesi -->
+    <main class="player-stage-container">
+      <div class="player-wrapper" id="player-wrapper">
+        
+        <!-- 1. YouTube Oynatıcısı -->
+        <div id="youtube-player-container" class="player-layer">
+          <div id="youtube-iframe-target"></div>
+        </div>
+
+        <!-- 2. HTML5 Video / HLS M3U8 Oynatıcısı -->
+        <div id="html5-player-container" class="player-layer hidden">
+          <video id="html5-video" playsinline preload="auto"></video>
+        </div>
+
+        <!-- 3. WebRTC Ekran & Sekme Paylaşım Oynatıcısı (Tam Oturan) -->
+        <div id="webrtc-player-container" class="player-layer hidden full-screen-mode">
+          <video id="webrtc-video" autoplay playsinline></video>
+          <div class="webrtc-live-badge">
+            <span class="live-dot"></span> CANLI YAYIN (60FPS)
+          </div>
+        </div>
+
+        <!-- 4. Harici Film Siteleri Proxy Embed Oynatıcısı -->
+        <div id="embed-player-container" class="player-layer hidden">
+          <iframe id="proxy-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-popups" allowfullscreen></iframe>
+        </div>
+
+        <!-- Bildirim Banner'ı (Toast Notification) -->
+        <div class="room-toast" id="room-toast">
+          <i class="fa-solid fa-circle-info"></i>
+          <span id="toast-text">Bildirim</span>
+        </div>
+
+        <!-- Özel Video Kontrol Çubuğu (Custom OSD Overlay) -->
+        <div class="custom-player-controls" id="custom-controls">
+          <!-- İlerleme Çubuğu (Scrubber Bar) -->
+          <div class="progress-container" id="progress-container">
+            <div class="progress-buffered" id="progress-buffered"></div>
+            <div class="progress-current" id="progress-current"></div>
+            <div class="progress-handle" id="progress-handle"></div>
+            <div class="progress-time-tooltip" id="progress-tooltip">00:00</div>
+          </div>
+
+          <div class="controls-bottom-row">
+            <div class="controls-left">
+              <!-- Oynat / Duraklat -->
+              <button class="ctrl-btn" id="ctrl-play-pause" title="Oynat/Duraklat (Host)">
+                <i class="fa-solid fa-play" id="play-pause-icon"></i>
+              </button>
+
+              <!-- Geri / İleri 10sn (Host) -->
+              <button class="ctrl-btn host-only-ctrl" id="ctrl-backward" title="10sn Geri">
+                <i class="fa-solid fa-rotate-left"></i>
+              </button>
+              <button class="ctrl-btn host-only-ctrl" id="ctrl-forward" title="10sn İleri">
+                <i class="fa-solid fa-rotate-right"></i>
+              </button>
+
+              <!-- Süre Sayacı -->
+              <div class="time-display">
+                <span id="current-time-text">00:00</span>
+                <span class="time-sep">/</span>
+                <span id="duration-time-text">00:00</span>
+              </div>
+
+              <!-- Host Kilit Durumu Bildirimi -->
+              <div class="host-lock-tag" id="host-lock-tag" title="Karşı taraf oynatmayı değiştiremez">
+                <i class="fa-solid fa-lock"></i>
+                <span>Host Kilidi Aktif</span>
+              </div>
+            </div>
+
+            <div class="controls-right">
+              <!-- Ekran Paylaşımı Boyutlandırma / Boşluk Doldurma Butonu -->
+              <button class="ctrl-btn" id="btn-toggle-fit" title="Ekranı Tam Oturt / Sığdır">
+                <i class="fa-solid fa-up-right-and-down-left-from-center" id="fit-icon"></i>
+              </button>
+
+              <!-- Bireysel / Bağımsız Ses Ayarı -->
+              <div class="volume-control-group">
+                <button class="ctrl-btn" id="ctrl-mute-btn" title="Sesi Aç/Kapat">
+                  <i class="fa-solid fa-volume-high" id="volume-icon"></i>
+                </button>
+                <div class="volume-slider-wrapper">
+                  <input type="range" id="volume-slider" min="0" max="100" value="80" class="cyber-slider">
+                </div>
+              </div>
+
+              <!-- Tam Ekran Butonu -->
+              <button class="ctrl-btn" id="ctrl-fullscreen" title="Tam Ekran">
+                <i class="fa-solid fa-expand"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Video Altı Bilgi Çubuğu -->
+      <div class="player-info-bar glass-card">
+        <div class="media-title-box">
+          <span class="badge-media-type" id="media-type-badge">YOUTUBE</span>
+          <h2 class="current-media-title" id="current-media-title">Senkronize Oynatıcı Hazır</h2>
+        </div>
+        <div class="media-info-actions">
+          <button class="action-chip" id="btn-re-sync" title="Host ile anında yeniden eşitle">
+            <i class="fa-solid fa-arrows-rotate"></i> Yeniden Eşitle
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Sağ Taraf: Canlı Sohbet & Katılımcı Paneli -->
+    <aside class="room-side-panel glass-panel" id="side-panel">
+      <!-- Sekme Başlıkları -->
+      <div class="side-tabs">
+        <button class="tab-btn active" id="tab-chat-btn">
+          <i class="fa-solid fa-comment-dots"></i> Sohbet
+        </button>
+        <button class="tab-btn" id="tab-users-btn">
+          <i class="fa-solid fa-user-group"></i> Katılımcılar (<span id="tab-users-count">1</span>)
+        </button>
+      </div>
+
+      <!-- 1. Sohbet Paneli -->
+      <div class="tab-content chat-tab-content active" id="chat-tab">
+        <!-- Mesaj Akış Alanı -->
+        <div class="chat-messages-container" id="chat-messages">
+          <div class="system-message">
+            <div class="system-badge"><i class="fa-solid fa-sparkles"></i> SyncParty'ye Hoş Geldiniz!</div>
+            <p>Video izlerken sohbet edebilir ve mesajlarınıza dilediğiniz gibi emoji ekleyebilirsiniz. Keyifli seyirler!</p>
+          </div>
+        </div>
+
+        <!-- Mesaj Gönderme Kutusu (Video akışını kesmez) -->
+        <div class="chat-input-area">
+          <div class="chat-input-wrapper">
+            <button class="btn-emoji-toggle" id="btn-emoji-toggle" title="Emoji Ekle">
+              <i class="fa-regular fa-face-smile"></i>
+            </button>
+            <input type="text" id="chat-input" class="chat-input-field" placeholder="Mesaj yaz veya emoji ekle..." maxlength="300" autocomplete="off">
+            <button class="btn-send-msg" id="btn-send-msg" title="Gönder">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </div>
+
+          <!-- Açılır Emoji Seçici Tablosu -->
+          <div class="emoji-picker-popup hidden" id="emoji-picker-popup">
+            <div class="emoji-grid" id="emoji-grid">
+              <span>😀</span><span>😂</span><span>😍</span><span>🥳</span><span>😎</span><span>🤯</span>
+              <span>🔥</span><span>❤️</span><span>🎉</span><span>🍿</span><span>🍕</span><span>🍻</span>
+              <span>👏</span><span>🙌</span><span>💯</span><span>🚀</span><span>✨</span><span>💀</span>
+              <span>👀</span><span>👻</span><span>⚡</span><span>🎬</span><span>🎧</span><span>🕺</span>
+              <span>🥺</span><span>😭</span><span>👍</span><span>👊</span><span>🖤</span><span>💣</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Katılımcılar Paneli -->
+      <div class="tab-content users-tab-content hidden" id="users-tab">
+        <div class="users-list-wrapper">
+          <h4 class="users-list-heading">Odadaki Kişiler</h4>
+          <div class="users-list" id="users-list-container">
+            <!-- Dinamik doldurulacak -->
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- MODAL: Video / Film Kaynağı Seçimi (Oda Sahibi / Host) -->
+  <div class="modal-backdrop hidden" id="media-modal">
+    <div class="modal-dialog glass-panel">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-clapperboard"></i> Ne İzlemek İstersiniz?</h3>
+        <button class="modal-close-btn" id="close-media-modal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="modal-tabs">
+        <button class="m-tab-btn active" data-source="youtube"><i class="fa-brands fa-youtube"></i> YouTube</button>
+        <button class="m-tab-btn" data-source="film"><i class="fa-solid fa-film"></i> Film / Dizi Sitesi</button>
+        <button class="m-tab-btn" data-source="direct"><i class="fa-solid fa-link"></i> Doğrudan Video (MP4/M3U8)</button>
+        <button class="m-tab-btn" data-source="screenshare"><i class="fa-solid fa-display"></i> Ekran Paylaşımı</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- 1. YouTube Formu -->
+        <div class="m-source-form" id="source-form-youtube">
+          <label class="input-label">YouTube Video Linki:</label>
+          <input type="text" id="input-yt-url" class="cyber-input" placeholder="https://www.youtube.com/watch?v=... veya https://youtu.be/...">
+          <div class="quick-examples">
+            <span>Örnekler:</span>
+            <button class="chip-sample" data-url="https://www.youtube.com/watch?v=jfKfPfyJRdk">Lofi Hip Hop</button>
+            <button class="chip-sample" data-url="https://www.youtube.com/watch?v=kJQP7kiw5Fk">Despacito</button>
+            <button class="chip-sample" data-url="https://www.youtube.com/watch?v=fJ9rUzIMcZQ">Queen</button>
+          </div>
+        </div>
+
+        <!-- 2. Film / Dizi Sitesi Formu (Gelişmiş Proxy & Akış Yakalayıcı) -->
+        <div class="m-source-form hidden" id="source-form-film">
+          <label class="input-label">Film / Dizi / Embed Oynatıcı Bağlantısı:</label>
+          <input type="text" id="input-film-url" class="cyber-input" placeholder="https://hdfilmcehennemi... veya https://vidmoly.to/embed-...">
+          <div class="notice-box">
+            <i class="fa-solid fa-shield-halved"></i>
+            <p>Gelişmiş Proxy'miz <code>X-Frame-Options</code>, <code>CSP</code> ve Frame-Busting korumalarını kaldırır. Sayfada doğrudan m3u8/mp4 varsa otomatik yakalanır.</p>
+          </div>
+        </div>
+
+        <!-- 3. Doğrudan MP4 / M3U8 Formu -->
+        <div class="m-source-form hidden" id="source-form-direct">
+          <label class="input-label">Doğrudan MP4 veya HLS (m3u8) Akış Linki:</label>
+          <input type="text" id="input-direct-url" class="cyber-input" placeholder="https://example.com/video.mp4 veya https://.../playlist.m3u8">
+        </div>
+
+        <!-- 4. Ekran Paylaşımı Bilgisi -->
+        <div class="m-source-form hidden" id="source-form-screenshare">
+          <div class="screenshare-promo">
+            <div class="promo-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+            <h4>Sıfır Gecikmeli WebRTC Ekran & Sekme Yayını</h4>
+            <p>HDFilmcehennemi ve tüm sitelerdeki filmleri tarayıcınızın sekmesinden <b>Sekme Sesi</b> ile birlikte tam ekran 60 FPS yayınlayabilirsiniz.</p>
+            <button class="cyber-btn btn-primary" id="btn-start-modal-screenshare">
+              <i class="fa-solid fa-display"></i> Ekran Paylaşımını Başlat
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="cyber-btn btn-secondary" id="cancel-media-modal">İptal</button>
+        <button class="cyber-btn btn-primary" id="apply-media-btn">
+          <i class="fa-solid fa-play"></i> Oynatmayı Başlat
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Oda Ayarları -->
+  <div class="modal-backdrop hidden" id="settings-modal">
+    <div class="modal-dialog glass-panel">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-sliders"></i> Oda Ayarları</h3>
+        <button class="modal-close-btn" id="close-settings-modal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-row">
+          <div>
+            <div class="setting-title">🔒 Yalnızca Oda Sahibi Kontrol Etsin (Host Lock)</div>
+            <div class="setting-sub">Açık olduğunda karşı taraf videoyu durduramaz, saramaz veya değiştiremez.</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="setting-host-lock" checked>
+            <span class="slider round"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-title">🌑 OLED Saf Siyah Modu</div>
+            <div class="setting-sub">Arka planı %100 saf siyaha çevirir.</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="setting-oled-mode">
+            <span class="slider round"></span>
+          </label>
+        </div>
+        <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 0.6rem;">
+          <div>
+            <div class="setting-title">🎨 Vurgu Renk Teması</div>
+            <div class="setting-sub">Buton, kenarlık ve efektlerin rengini değiştirin.</div>
+          </div>
+          <div class="color-picker-row" id="room-color-picker">
+            <div class="color-dot active" data-color="#b3001e" title="Koyu Kırmızı" style="background-color: #b3001e;"></div>
+            <div class="color-dot" data-color="#8b0018" title="Derin Bordo" style="background-color: #8b0018;"></div>
+            <div class="color-dot" data-color="#d90429" title="Yakut Kırmızı" style="background-color: #d90429;"></div>
+            <div class="color-dot" data-color="#7928ca" title="Neon Mor" style="background-color: #7928ca;"></div>
+            <div class="color-dot" data-color="#00f2fe" title="Siber Mavi" style="background-color: #00f2fe;"></div>
+            <div class="color-dot" data-color="#ff9900" title="Altın Turuncu" style="background-color: #ff9900;"></div>
+            <div class="color-dot" data-color="#10b981" title="Zümrüt Yeşil" style="background-color: #10b981;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="cyber-btn btn-primary" id="save-settings-btn">Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- YouTube IFrame API Script -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <!-- Uygulama Modülleri -->
+  <script src="/js/sync-engine.js"></script>
+  <script src="/js/webrtc-share.js"></script>
+  <script src="/js/chat.js"></script>
+  <script src="/js/room.js"></script>
+</body>
+</html>

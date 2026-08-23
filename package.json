@@ -1,0 +1,29 @@
+{
+  "name": "rave-watch-party",
+  "version": "1.0.0",
+  "description": "Rave benzeri modern, siyah-kırmızı temalı gerçek zamanlı birlikte video/dizi/film izleme uygulaması.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build-zip": "node zip-builder.js"
+  },
+  "keywords": [
+    "watch-party",
+    "rave",
+    "synced-video",
+    "youtube",
+    "webrtc",
+    "socketio",
+    "stream-party"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "axios": "^1.7.2",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
