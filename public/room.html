@@ -179,13 +179,14 @@
                 <i class="fa-solid fa-up-right-and-down-left-from-center" id="fit-icon"></i>
               </button>
 
-              <!-- Bireysel / Bağımsız Ses Ayarı -->
+              <!-- Bireysel / Bağımsız Ses Ayarı (200% Audio Booster) -->
               <div class="volume-control-group">
                 <button class="ctrl-btn" id="ctrl-mute-btn" title="Sesi Aç/Kapat">
                   <i class="fa-solid fa-volume-high" id="volume-icon"></i>
                 </button>
                 <div class="volume-slider-wrapper">
-                  <input type="range" id="volume-slider" min="0" max="100" value="80" class="cyber-slider">
+                  <input type="range" id="volume-slider" min="0" max="200" value="100" class="cyber-slider" title="Ses Düzeyi (%200 Ses Güçlendirici)">
+                  <span id="volume-tooltip" class="volume-tooltip">100%</span>
                 </div>
               </div>
 
@@ -339,14 +340,23 @@
           <input type="text" id="input-direct-url" class="cyber-input" placeholder="https://example.com/video.mp4 veya https://.../playlist.m3u8">
         </div>
 
-        <!-- 4. Ekran Paylaşımı Bilgisi -->
+        <!-- 4. Ekran Paylaşımı Bilgisi & Kusursuz Film İzleme Rehberi -->
         <div class="m-source-form hidden" id="source-form-screenshare">
           <div class="screenshare-promo">
-            <div class="promo-icon"><i class="fa-solid fa-satellite-dish"></i></div>
-            <h4>Sıfır Gecikmeli WebRTC Ekran & Sekme Yayını</h4>
-            <p>HDFilmcehennemi ve tüm sitelerdeki filmleri tarayıcınızın sekmesinden <b>Sekme Sesi</b> ile birlikte tam ekran 60 FPS yayınlayabilirsiniz.</p>
-            <button class="cyber-btn btn-primary" id="btn-start-modal-screenshare">
-              <i class="fa-solid fa-display"></i> Ekran Paylaşımını Başlat
+            <div class="promo-icon"><i class="fa-solid fa-film"></i></div>
+            <h4 style="color:#fff;font-size:1.1rem;margin-bottom:0.4rem;">🎬 HDFilmcehennemi ve Film Sitelerini İzleme Rehberi</h4>
+            <p style="color:#aaa;font-size:0.85rem;margin-bottom:1rem;">
+              Farenin, masaüstünün veya diğer sekmelerin görünmemesi ve <b>filmin gür sesle gitmesi</b> için aşağıdaki 3 adımı uygulayın:
+            </p>
+            
+            <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 16px;text-align:left;margin-bottom:1.2rem;font-size:0.85rem;line-height:1.6;">
+              <div style="margin-bottom:6px;"><span style="background:var(--accent-red);color:#fff;padding:2px 7px;border-radius:4px;font-weight:bold;margin-right:6px;">1</span> Başlat'a basınca açılan pencerede <b>"TÜM EKRAN" DEĞİL, "SEKME (Chrome/Opera)"</b> seçeneğine tıklayın.</div>
+              <div style="margin-bottom:6px;"><span style="background:var(--accent-red);color:#fff;padding:2px 7px;border-radius:4px;font-weight:bold;margin-right:6px;">2</span> Filmin açık olduğu tarayıcı sekmesini seçin.</div>
+              <div><span style="background:var(--accent-red);color:#fff;padding:2px 7px;border-radius:4px;font-weight:bold;margin-right:6px;">3</span> Sol alttaki <b>"Sekme sesini de paylaş"</b> kutucuğunun AÇIK olduğundan emin olun!</div>
+            </div>
+
+            <button class="cyber-btn btn-primary" id="btn-start-modal-screenshare" style="width:100%;padding:0.75rem;font-size:1rem;">
+              <i class="fa-solid fa-display"></i> Şimdi Ekran Paylaşımını Başlat
             </button>
           </div>
         </div>

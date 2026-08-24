@@ -112,30 +112,44 @@ app.get('/api/proxy-embed', async (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Access-Control-Allow-Origin', '*');
 
-    // Base tag ekle (Göreceli stil/script dosyaları ana siteden yüklensin)
-    const baseTag = `<base href="${targetUrl}">
+    // Base tag & Reklam/Popup Engelleyici Script Enjekte Et
+    const injectScripts = `<base href="${targetUrl}">
     <script>
-      // Anti-Frame Buster Koruması
+      // Frame Buster Koruması & İstenmeyen Popup Engelleme
       try {
         Object.defineProperty(window, 'top', { get: function() { return window.self; } });
         Object.defineProperty(window, 'parent', { get: function() { return window.self; } });
+        window.open = function() { console.log('Popup engellendi'); return null; };
       } catch(e) {}
-    </script>`;
+    </script>
+    <style>
+      /* İstenmeyen reklam katmanlarını gizle */
+      iframe[src*="ad"], .ad-box, .banner-ad, [class*="reklam"], [id*="reklam"] { display: none !important; opacity: 0 !important; }
+    </style>`;
 
     if (html.includes('<head>')) {
-      html = html.replace('<head>', `<head>${baseTag}`);
+      html = html.replace('<head>', `<head>${injectScripts}`);
     } else {
-      html = `${baseTag}${html}`;
+      html = `${injectScripts}${html}`;
     }
 
     res.send(html);
   } catch (error) {
     console.error('Proxy Hatası:', error.message);
     res.status(500).send(`
-      <div style="background:#0a0a0f;color:#c1121f;padding:24px;font-family:sans-serif;text-align:center;border-radius:12px;margin:20px;border:1px solid #7f1d1d;">
-        <h3 style="margin-bottom:8px;">⚠️ Site İleri Düzey Bot Korumasına Sahip</h3>
-        <p style="color:#aaa;font-size:14px;">Bu sitedeki film akışı doğrudan iframe ile açılamadı.</p>
-        <p style="color:#fff;margin-top:12px;font-size:14px;"><b>Çözüm:</b> Yukarıdaki <b>"Ekran Paylaşımı"</b> modunu kullanarak filmi sekmenizden sıfır gecikmeyle birlikte izleyebilirsiniz.</p>
+      <div style="background:#0a0a0f;color:#ef4444;padding:28px;font-family:sans-serif;text-align:center;border-radius:12px;margin:20px;border:1px solid rgba(239,68,68,0.3);box-shadow:0 0 20px rgba(239,68,68,0.15);">
+        <div style="font-size:36px;margin-bottom:12px;">🛡️</div>
+        <h3 style="margin-bottom:8px;color:#fff;font-size:18px;">Bu Film Sitesi Doğrudan Iframe'i Engelliyor</h3>
+        <p style="color:#aaa;font-size:14px;line-height:1.5;max-width:500px;margin:0 auto 16px auto;">
+          HDFilmcehennemi ve benzeri siteler güvenlik gereği iç içe gömülmeyi engeller.
+        </p>
+        <div style="background:rgba(255,255,255,0.06);padding:14px;border-radius:8px;max-width:480px;margin:0 auto;text-align:left;font-size:13px;color:#e2e8f0;">
+          <b style="color:#f59e0b;">💡 Kesintisiz & Donmasız Çözüm:</b><br>
+          1. Filmi yeni bir tarayıcı sekmesinde açın.<br>
+          2. Buradan <b>"Ekran Paylaş"</b> butonuna tıklayın.<br>
+          3. Açılan pencerede <b>"Sekme"</b>yi seçip sol alttaki <b>"Sekme sesini de paylaş"</b>ı işaretleyin.<br>
+          🚀 <b>Sonuç:</b> Mouse, masaüstü veya diğer sekmeler görünmez, sadece film ve gür sesi odaya yansır!
+        </div>
       </div>
     `);
   }

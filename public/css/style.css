@@ -1159,9 +1159,20 @@ html, body {
 }
 
 .volume-slider-wrapper {
-  width: 80px;
+  width: 90px;
   display: flex;
   align-items: center;
+  position: relative;
+}
+
+.volume-tooltip {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  margin-left: 6px;
+  white-space: nowrap;
+  color: #fff;
+  min-width: 38px;
 }
 
 .cyber-slider {
@@ -1176,11 +1187,11 @@ html, body {
 
 .cyber-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: var(--accent-red);
-  box-shadow: 0 0 6px var(--accent-red);
+  box-shadow: 0 0 8px var(--accent-red);
   cursor: pointer;
   transition: transform 0.1s;
 }

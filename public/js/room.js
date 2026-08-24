@@ -330,18 +330,30 @@ class RoomEngine {
       });
     });
 
-    // Örnek YouTube Butonları
+    // Örnek YouTube ve Film Butonları
     document.querySelectorAll('.chip-sample').forEach(chip => {
       chip.addEventListener('click', () => {
-        document.getElementById('input-yt-url').value = chip.dataset.url;
+        const url = chip.dataset.url;
+        if (selectedSource === 'film') {
+          const filmInput = document.getElementById('input-film-url');
+          if (filmInput) filmInput.value = url;
+        } else {
+          const ytInput = document.getElementById('input-yt-url');
+          if (ytInput) ytInput.value = url;
+        }
       });
     });
 
     // Modal Ekran Paylaşımı Başlat
-    document.getElementById('btn-start-modal-screenshare').addEventListener('click', () => {
-      hideModal();
-      window.webrtcEngine.startScreenShare();
-    });
+    const modalScreenShareBtn = document.getElementById('btn-start-modal-screenshare');
+    if (modalScreenShareBtn) {
+      modalScreenShareBtn.addEventListener('click', () => {
+        hideModal();
+        if (window.webrtcShare) {
+          window.webrtcShare._promptAndStartShare();
+        }
+      });
+    }
 
     // Medya Uygula Butonu
     applyMediaBtn.addEventListener('click', async () => {

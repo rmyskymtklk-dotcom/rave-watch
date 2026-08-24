@@ -44,8 +44,8 @@ class SyncEngine {
     this.hostLockTag = document.getElementById('host-lock-tag');
     this.pipBtn = document.getElementById('ctrl-pip');
 
-    // Bağımsız Yerel Ses Düzeyi (Varsayılan: %80)
-    this.localVolume = parseFloat(localStorage.getItem('sync_volume') || '80');
+    // Bağımsız Yerel Ses Düzeyi (Varsayılan: %100, Maksimum: %200 Boost)
+    this.localVolume = parseFloat(localStorage.getItem('sync_volume') || '100');
     this.isMuted = localStorage.getItem('sync_muted') === 'true';
 
     // Senkronizasyon ve Arka Plan Oynatma Durumu
@@ -62,9 +62,10 @@ class SyncEngine {
   }
 
   // -----------------------------------------------------------
-  // BAĞIMSIZ SES AYARI (Her Kullanıcı Kendi Sesini Yönetir)
+  // BAĞIMSIZ SES AYARI & 200% SES GÜÇLENDİRİCİ (AUDIO BOOSTER)
   // -----------------------------------------------------------
   setupVolume() {
+    this.volumeTooltip = document.getElementById('volume-tooltip');
     this.volumeSlider.value = this.localVolume;
     this.applyVolume();
 
@@ -86,26 +87,40 @@ class SyncEngine {
   applyVolume() {
     const vol = this.isMuted ? 0 : this.localVolume;
     
-    // YouTube Sesi
+    // Tooltip güncelle
+    if (this.volumeTooltip) {
+      if (this.isMuted || vol === 0) {
+        this.volumeTooltip.textContent = 'Sessiz';
+        this.volumeTooltip.style.color = '#ef4444';
+      } else if (vol > 100) {
+        this.volumeTooltip.textContent = `${Math.round(vol)}% 🚀`;
+        this.volumeTooltip.style.color = '#f59e0b';
+      } else {
+        this.volumeTooltip.textContent = `${Math.round(vol)}%`;
+        this.volumeTooltip.style.color = '#fff';
+      }
+    }
+
+    // YouTube Sesi (0-100 ölçekli)
     if (this.ytPlayer && this.isYtReady && typeof this.ytPlayer.setVolume === 'function') {
       if (this.isMuted) {
         this.ytPlayer.mute();
       } else {
         this.ytPlayer.unMute();
-        this.ytPlayer.setVolume(vol);
+        this.ytPlayer.setVolume(Math.min(100, vol));
       }
     }
 
     // HTML5 Sesi
     if (this.html5Video) {
-      this.html5Video.volume = vol / 100;
+      this.html5Video.volume = Math.min(1.0, vol / 100);
       this.html5Video.muted = this.isMuted;
     }
 
     // WebRTC Sesi
     if (this.webrtcVideo) {
-      this.webrtcVideo.volume = vol / 100;
-      if (window.webrtcEngine && window.webrtcEngine.isSharing) {
+      this.webrtcVideo.volume = Math.min(1.0, vol / 100);
+      if (window.webrtcShare && window.webrtcShare.isSharing) {
         this.webrtcVideo.muted = true;
       } else {
         this.webrtcVideo.muted = this.isMuted;
