@@ -107,60 +107,67 @@ class ChatEngine {
   }
 
   renderMessage(msg) {
-    const isOwn = msg.userId === this.socket.id;
-    const bubble = document.createElement('div');
-    bubble.className = `chat-bubble ${isOwn ? 'own-message' : ''}`;
-    bubble.dataset.id = msg.id;
+    requestAnimationFrame(() => {
+      const isOwn = msg.userId === this.socket.id;
+      const bubble = document.createElement('div');
+      bubble.className = `chat-bubble ${isOwn ? 'own-message' : ''}`;
+      bubble.dataset.id = msg.id;
 
-    // Alıntılanan / Yanıt Verilen Mesaj Bloğu (Varsa)
-    if (msg.replyTo) {
-      const quoteDiv = document.createElement('div');
-      quoteDiv.className = 'chat-quote-bubble';
-      quoteDiv.innerHTML = `
-        <div class="quote-header">
-          <i class="fa-solid fa-reply"></i>
-          <span>${this.escapeHtml(msg.replyTo.username)}</span>
-        </div>
-        <div class="quote-content">${this.escapeHtml(msg.replyTo.text)}</div>
-      `;
-      bubble.appendChild(quoteDiv);
-    }
+      // Alıntılanan / Yanıt Verilen Mesaj Bloğu (Varsa)
+      if (msg.replyTo) {
+        const quoteDiv = document.createElement('div');
+        quoteDiv.className = 'chat-quote-bubble';
+        quoteDiv.innerHTML = `
+          <div class="quote-header">
+            <i class="fa-solid fa-reply"></i>
+            <span>${this.escapeHtml(msg.replyTo.username)}</span>
+          </div>
+          <div class="quote-content">${this.escapeHtml(msg.replyTo.text)}</div>
+        `;
+        bubble.appendChild(quoteDiv);
+      }
 
-    // Gönderen Bilgi Satırı
-    const senderRow = document.createElement('div');
-    senderRow.className = 'chat-sender-info';
-    senderRow.style.color = msg.avatarColor || 'var(--accent-red)';
+      // Gönderen Bilgi Satırı
+      const senderRow = document.createElement('div');
+      senderRow.className = 'chat-sender-info';
+      senderRow.style.color = msg.avatarColor || 'var(--accent-red)';
 
-    let senderHtml = `<span>${this.escapeHtml(msg.username)}</span>`;
-    if (msg.isHost) {
-      senderHtml += `<span class="chat-host-tag">HOST</span>`;
-    }
-    senderHtml += `<span class="chat-time">${msg.time}</span>`;
-    senderRow.innerHTML = senderHtml;
+      let senderHtml = `<span>${this.escapeHtml(msg.username)}</span>`;
+      if (msg.isHost) {
+        senderHtml += `<span class="chat-host-tag">HOST</span>`;
+      }
+      senderHtml += `<span class="chat-time">${msg.time}</span>`;
+      senderRow.innerHTML = senderHtml;
 
-    // Mesaj Metni
-    const textDiv = document.createElement('div');
-    textDiv.className = 'chat-text';
-    textDiv.textContent = msg.text;
+      // Mesaj Metni
+      const textDiv = document.createElement('div');
+      textDiv.className = 'chat-text';
+      textDiv.textContent = msg.text;
 
-    // Hızlı Yanıt Butonu
-    const replyBtn = document.createElement('button');
-    replyBtn.className = 'chat-action-reply';
-    replyBtn.title = 'Bu mesaja yanıt ver';
-    replyBtn.innerHTML = `<i class="fa-solid fa-reply"></i>`;
-    replyBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.setReplyTarget(msg);
+      // Hızlı Yanıt Butonu
+      const replyBtn = document.createElement('button');
+      replyBtn.className = 'chat-action-reply';
+      replyBtn.title = 'Bu mesaja yanıt ver';
+      replyBtn.innerHTML = `<i class="fa-solid fa-reply"></i>`;
+      replyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.setReplyTarget(msg);
+      });
+
+      bubble.appendChild(senderRow);
+      bubble.appendChild(textDiv);
+      bubble.appendChild(replyBtn);
+
+      this.chatMessagesContainer.appendChild(bubble);
+
+      // DOM Temizliği (Maksimum 60 mesaj tut, aşırı şişmeyi ve kasmayı engelle)
+      if (this.chatMessagesContainer.children.length > 65) {
+        this.chatMessagesContainer.removeChild(this.chatMessagesContainer.children[1]);
+      }
+
+      // Yumuşak kaydır
+      this.chatMessagesContainer.scrollTop = this.chatMessagesContainer.scrollHeight;
     });
-
-    bubble.appendChild(senderRow);
-    bubble.appendChild(textDiv);
-    bubble.appendChild(replyBtn);
-
-    this.chatMessagesContainer.appendChild(bubble);
-
-    // Otomatik en alta yumuşak kaydır
-    this.chatMessagesContainer.scrollTop = this.chatMessagesContainer.scrollHeight;
   }
 
   escapeHtml(text) {
