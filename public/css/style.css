@@ -855,21 +855,31 @@ html, body {
   display: block;
 }
 
-/* WebRTC canvas ve video - player-layer'ın flex merkezi içinde tam ekran */
+/* WebRTC canvas ve donanımsal video - Sıfır Boşluk & Tam Merkezleme */
 #webrtc-canvas,
 .live-screen-canvas {
-  width: 100%;
-  height: 100%;
-  background: #000;
-  display: block;
-}
-
-#webrtc-video {
-  width: 100%;
-  height: 100%;
+  width: 100% !important;
+  height: 100% !important;
   object-fit: contain;
   background: #000;
   display: block;
+  margin: auto;
+}
+
+#webrtc-video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+  background: #000;
+  display: block;
+  margin: auto;
+}
+
+/* Ekranı Doldur Modu (Boşluksuz Tam Ekran) */
+.fill-screen-mode #webrtc-video,
+.fill-screen-mode #webrtc-canvas,
+.fill-screen-mode .live-screen-canvas {
+  object-fit: cover !important;
 }
 
 /* Proxy Embed IFrame */

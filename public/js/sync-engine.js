@@ -427,6 +427,15 @@ class SyncEngine {
       document.getElementById('webrtc-player-container').classList.remove('hidden');
     }
 
+    // Canlı yayında (WebRTC) Scrubber çubuğunu gizle
+    if (this.progressContainer) {
+      if (this.currentMediaType === 'webrtc') {
+        this.progressContainer.style.display = 'none';
+      } else {
+        this.progressContainer.style.display = 'block';
+      }
+    }
+
     this.updateMediaSession(title, isPlaying);
   }
 
