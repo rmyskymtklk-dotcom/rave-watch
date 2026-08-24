@@ -149,6 +149,19 @@ class RoomEngine {
       });
     }
 
+    // Sinema Modu / Sohbeti Kapat Geniş Ekran Toggle
+    const theaterBtn = document.getElementById('btn-theater-mode');
+    if (theaterBtn) {
+      theaterBtn.addEventListener('click', () => {
+        const mainLayout = document.querySelector('.room-main-layout');
+        if (mainLayout) {
+          mainLayout.classList.toggle('theater-mode');
+          const isTheater = mainLayout.classList.contains('theater-mode');
+          window.showToast(isTheater ? '🎬 Sinema Modu: Geniş Ekran Aktif' : '💬 Sohbet Görünümü Açıldı');
+        }
+      });
+    }
+
     // Ekranı Tam Doldurma / Boşluk Doldur Butonu (Fill / Contain Toggle)
     const fitBtn = document.getElementById('btn-toggle-fit');
     if (fitBtn) {
@@ -377,18 +390,18 @@ class RoomEngine {
           const extractData = await extractRes.json();
 
           if (extractData.success && extractData.streamUrl) {
-            type = extractData.type === 'hls' ? 'html5' : 'html5';
+            type = extractData.type || 'embed';
             url = extractData.streamUrl;
-            title = '🎬 Doğrudan Film Yayını';
-            window.showToast('🎉 Video akışı başarıyla ayıklandı!');
+            title = extractData.isDirectPlayer ? '🎬 Doğrudan Player Yayını' : '🎬 Film / Dizi Yayını';
+            window.showToast('🎉 Film akışı bağlandı!');
           } else {
             type = 'embed';
-            url = filmUrl;
+            url = `/api/proxy-embed?url=${encodeURIComponent(filmUrl)}`;
             title = '🎬 Film Sitesi Yayını (Proxy)';
           }
         } catch (e) {
           type = 'embed';
-          url = filmUrl;
+          url = `/api/proxy-embed?url=${encodeURIComponent(filmUrl)}`;
           title = '🎬 Film Sitesi Yayını (Proxy)';
         }
       } else if (type === 'direct') {

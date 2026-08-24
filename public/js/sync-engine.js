@@ -421,8 +421,8 @@ class SyncEngine {
       this.loadHtml5Video(url, currentTime, isPlaying);
     } else if (this.currentMediaType === 'embed') {
       document.getElementById('embed-player-container').classList.remove('hidden');
-      const proxyUrl = `/api/proxy-embed?url=${encodeURIComponent(url)}`;
-      this.embedIframe.src = proxyUrl;
+      const finalUrl = url.startsWith('/api/proxy-embed') ? url : `/api/proxy-embed?url=${encodeURIComponent(url)}`;
+      this.embedIframe.src = finalUrl;
     } else if (this.currentMediaType === 'webrtc') {
       document.getElementById('webrtc-player-container').classList.remove('hidden');
     }

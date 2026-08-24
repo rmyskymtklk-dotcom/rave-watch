@@ -743,6 +743,15 @@ html, body {
   height: calc(100vh - 60px);
   overflow: hidden;
   position: relative;
+  transition: grid-template-columns 0.25s ease;
+}
+
+.room-main-layout.theater-mode {
+  grid-template-columns: 1fr 0px !important;
+}
+
+.room-main-layout.theater-mode .room-sidebar-panel {
+  display: none !important;
 }
 
 /* Sol Taraf: Oynatıcı Sahnesi */
