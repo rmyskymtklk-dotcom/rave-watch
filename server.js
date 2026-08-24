@@ -552,10 +552,10 @@ io.on('connection', (socket) => {
     socket.to(currentRoomId).emit('screenshare-frame-chunk', chunk);
   });
 
-  // Canlı Ekran Ses Karesi Rölesi
-  socket.on('screenshare-audio-chunk', (audioChunk) => {
+  // Canlı Ekran Ham Ses (PCM Web Audio) Rölesi
+  socket.on('screenshare-audio-raw', (audioData) => {
     if (!currentRoomId || !currentUser || !currentUser.isHost) return;
-    socket.to(currentRoomId).emit('screenshare-audio-chunk', audioChunk);
+    socket.to(currentRoomId).emit('screenshare-audio-raw', audioData);
   });
 
   // İzleyici Ekran Akışını Talep Ettiğinde (Yeniden Bağlantı Garantisi)

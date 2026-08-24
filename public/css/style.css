@@ -1986,6 +1986,8 @@ input:checked + .slider:before {
 
 /* Ekranı Tam Doldurma / Boşluksuz Mod (Fill Screen Mode) */
 .fill-screen-mode #webrtc-video,
+.fill-screen-mode #webrtc-canvas,
+.fill-screen-mode .live-screen-canvas,
 .fill-screen-mode #html5-video {
   object-fit: fill !important;
   width: 100% !important;
