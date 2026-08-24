@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * SYNCPARTY WEBRTC SCREEN & TAB AUDIO SHARING ENGINE
- * W3C Standartlarında Canlı Ekran & Film Yayını (PC, Mobil & iOS Uyumlu)
+ * Güvenli JSON Sinyalleşmeli, 60 FPS Kesintisiz Canlı Ekran & Film Yayını
  * ============================================================================
  */
 
@@ -9,6 +9,7 @@ class WebRTCShareEngine {
   constructor(socket) {
     this.socket = socket;
     this.localStream = null;
+    this.remoteStream = null;
     this.peerConnections = new Map(); // peerId -> RTCPeerConnection
     this.isSharing = false;
 
@@ -18,7 +19,7 @@ class WebRTCShareEngine {
     this.autoplayOverlay = document.getElementById('webrtc-autoplay-overlay');
     this.resumeLiveBtn = document.getElementById('btn-resume-live');
 
-    // Güvenilir Global STUN & TURN Sunucu Havuzu
+    // Genişletilmiş Yüksek Hızlı STUN & TURN Sunucu Havuzu
     this.rtcConfig = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -27,6 +28,7 @@ class WebRTCShareEngine {
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' },
         { urls: 'stun:stun.cloudflare.com:3478' },
+        { urls: 'stun:global.stun.twilio.com:3478' },
         { urls: 'stun:stun.services.mozilla.com' },
         {
           urls: [
@@ -53,6 +55,10 @@ class WebRTCShareEngine {
       this.webrtcVideo.setAttribute('webkit-playsinline', '');
       this.webrtcVideo.playsInline = true;
       this.webrtcVideo.muted = true;
+      
+      this.webrtcVideo.addEventListener('loadedmetadata', () => {
+        this.webrtcVideo.play().catch(() => {});
+      });
     }
 
     // Mobil ve Masaüstü Kilit Çözücü Buton
@@ -103,10 +109,10 @@ class WebRTCShareEngine {
       await this.handleSignal(senderId, signal, type);
     });
 
-    // Yeni kullanıcı odaya girdiğinde (Host tarafı canlı akış sunar)
+    // Yeni kullanıcı odaya girdiğinde (Host tarafı akış sunar)
     this.socket.on('user-joined', ({ user }) => {
       if (this.isSharing && this.localStream && user.id !== this.socket.id) {
-        console.log('[WebRTC] Yeni kullanıcı katıldı, akış açılıyor:', user.id);
+        console.log('[WebRTC] Yeni katılımcı algılandı:', user.id);
         this.createPeerConnection(user.id, true);
       }
     });
@@ -114,7 +120,7 @@ class WebRTCShareEngine {
     // İzleyici F5 attığında veya sonradan katıldığında gelen talep
     this.socket.on('guest-requested-screenshare', ({ guestId }) => {
       if (this.isSharing && this.localStream) {
-        console.log('[WebRTC] İzleyiciden akış talebi alındı:', guestId);
+        console.log('[WebRTC] İzleyiciden akış talebi geldi:', guestId);
         this.createPeerConnection(guestId, true);
       }
     });
@@ -128,7 +134,7 @@ class WebRTCShareEngine {
           if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
           setTimeout(() => {
             this.socket.emit('request-screenshare-stream');
-          }, 250);
+          }, 200);
         } else {
           window.syncEngine.loadMedia(media);
           window.showToast('📺 Ekran yayını sonlandırıldı.');
@@ -204,7 +210,7 @@ class WebRTCShareEngine {
       // Sunucuya ve odaya bildir
       this.socket.emit('screenshare-status', { active: true });
 
-      // Odadaki tüm izleyicilere WebRTC bağlantısı kur
+      // Odadaki tüm izleyicilere WebRTC teklifi (Offer) gönder
       if (window.roomEngine && window.roomEngine.users) {
         window.roomEngine.users.forEach(user => {
           if (user.id !== this.socket.id) {
@@ -285,25 +291,31 @@ class WebRTCShareEngine {
       
       // Tüm tarayıcılarda engelsiz oynatma için sessiz başlat
       this.webrtcVideo.muted = true;
-      this.webrtcVideo.play().then(() => {
-        // Görüntü ekranda! Sesi açmayı dene
-        this.webrtcVideo.muted = false;
-        window.syncEngine.applyVolume();
-        if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
-      }).catch(() => {
-        // Tarayıcı güvenlik engeli: Sessiz oynat ve butonu göster
-        this.webrtcVideo.muted = true;
-        this.webrtcVideo.play().catch(() => {});
-        if (this.autoplayOverlay) this.autoplayOverlay.classList.remove('hidden');
-      });
+      const playPromise = this.webrtcVideo.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          this.webrtcVideo.muted = false;
+          window.syncEngine.applyVolume();
+          if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
+        }).catch(() => {
+          this.webrtcVideo.muted = true;
+          this.webrtcVideo.play().catch(() => {});
+          if (this.autoplayOverlay) this.autoplayOverlay.classList.remove('hidden');
+        });
+      }
     };
 
-    // ICE Adaylarını İlet
+    // ICE Adaylarını İlet (Güvenli JSON serileştirmesi ile)
     pc.onicecandidate = (event) => {
       if (event.candidate) {
+        const candidateData = event.candidate.toJSON ? event.candidate.toJSON() : {
+          candidate: event.candidate.candidate,
+          sdpMid: event.candidate.sdpMid,
+          sdpMLineIndex: event.candidate.sdpMLineIndex
+        };
         this.socket.emit('webrtc-signal', {
           targetId: peerId,
-          signal: event.candidate,
+          signal: candidateData,
           type: 'candidate'
         });
       }
@@ -327,7 +339,10 @@ class WebRTCShareEngine {
           await pc.setLocalDescription(offer);
           this.socket.emit('webrtc-signal', {
             targetId: peerId,
-            signal: pc.localDescription,
+            signal: {
+              type: pc.localDescription.type || 'offer',
+              sdp: pc.localDescription.sdp
+            },
             type: 'offer'
           });
         } catch (err) {
@@ -347,7 +362,11 @@ class WebRTCShareEngine {
 
     try {
       if (type === 'offer') {
-        await pc.setRemoteDescription(new RTCSessionDescription(signal));
+        const desc = new RTCSessionDescription({
+          type: signal.type || 'offer',
+          sdp: signal.sdp
+        });
+        await pc.setRemoteDescription(desc);
         
         // Biriken ICE adaylarını ekle
         if (pc.iceCandidatesQueue && pc.iceCandidatesQueue.length > 0) {
@@ -363,12 +382,19 @@ class WebRTCShareEngine {
         await pc.setLocalDescription(answer);
         this.socket.emit('webrtc-signal', {
           targetId: senderId,
-          signal: pc.localDescription,
+          signal: {
+            type: pc.localDescription.type || 'answer',
+            sdp: pc.localDescription.sdp
+          },
           type: 'answer'
         });
       } else if (type === 'answer') {
         if (pc.signalingState !== 'stable') {
-          await pc.setRemoteDescription(new RTCSessionDescription(signal));
+          const desc = new RTCSessionDescription({
+            type: signal.type || 'answer',
+            sdp: signal.sdp
+          });
+          await pc.setRemoteDescription(desc);
           
           if (pc.iceCandidatesQueue && pc.iceCandidatesQueue.length > 0) {
             for (const cand of pc.iceCandidatesQueue) {
@@ -380,13 +406,16 @@ class WebRTCShareEngine {
           }
         }
       } else if (type === 'candidate') {
-        if (pc.remoteDescription && pc.remoteDescription.type) {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(signal));
-          } catch(e) {}
-        } else {
-          if (!pc.iceCandidatesQueue) pc.iceCandidatesQueue = [];
-          pc.iceCandidatesQueue.push(signal);
+        if (signal && signal.candidate) {
+          const cand = new RTCIceCandidate(signal);
+          if (pc.remoteDescription && pc.remoteDescription.type) {
+            try {
+              await pc.addIceCandidate(cand);
+            } catch(e) {}
+          } else {
+            if (!pc.iceCandidatesQueue) pc.iceCandidatesQueue = [];
+            pc.iceCandidatesQueue.push(signal);
+          }
         }
       }
     } catch (err) {
