@@ -546,6 +546,18 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Canlı Ekran Video Karesi Rölesi (Zero-NAT Anında İletim)
+  socket.on('screenshare-frame-chunk', (chunk) => {
+    if (!currentRoomId || !currentUser || !currentUser.isHost) return;
+    socket.to(currentRoomId).emit('screenshare-frame-chunk', chunk);
+  });
+
+  // Canlı Ekran Ses Karesi Rölesi
+  socket.on('screenshare-audio-chunk', (audioChunk) => {
+    if (!currentRoomId || !currentUser || !currentUser.isHost) return;
+    socket.to(currentRoomId).emit('screenshare-audio-chunk', audioChunk);
+  });
+
   // İzleyici Ekran Akışını Talep Ettiğinde (Yeniden Bağlantı Garantisi)
   socket.on('request-screenshare-stream', () => {
     if (!currentRoomId) return;

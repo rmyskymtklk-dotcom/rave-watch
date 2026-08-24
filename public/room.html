@@ -104,11 +104,13 @@
           <video id="html5-video" playsinline preload="auto"></video>
         </div>
 
-        <!-- 3. WebRTC Ekran & Sekme Paylaşım Oynatıcısı (Tam Oturan) -->
+        <!-- 3. WebRTC & Canlı Ekran / Film Oynatıcısı (Çift Kanallı Kesintisiz Yansıtma) -->
         <div id="webrtc-player-container" class="player-layer hidden full-screen-mode">
-          <video id="webrtc-video" autoplay playsinline></video>
+          <canvas id="webrtc-canvas" class="live-screen-canvas"></canvas>
+          <video id="webrtc-video" autoplay playsinline class="hidden"></video>
+          <audio id="webrtc-audio-player" autoplay playsinline></audio>
           <div class="webrtc-live-badge">
-            <span class="live-dot"></span> CANLI YAYIN (60FPS)
+            <span class="live-dot"></span> CANLI YAYIN
           </div>
           <!-- Tarayıcı Otomatik Oynatma Güvenlik Kilidi Çözücü Buton -->
           <div class="webrtc-autoplay-overlay hidden" id="webrtc-autoplay-overlay">
