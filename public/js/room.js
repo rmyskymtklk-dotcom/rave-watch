@@ -58,7 +58,8 @@ class RoomEngine {
     // Alt Motorlar
     window.syncEngine = new SyncEngine(this.socket);
     window.chatEngine = new ChatEngine(this.socket);
-    window.webrtcEngine = new WebRTCShareEngine(this.socket);
+    window.webrtcShare = new WebRTCShareEngine(this.socket);
+    window.webrtcEngine = window.webrtcShare; // alias
 
     this.init();
     this.initTheme();
@@ -450,8 +451,10 @@ class RoomEngine {
         // Eğer odada aktif ekran paylaşımı varsa hemen akışı talep et
         if (data.media.type === 'webrtc') {
           setTimeout(() => {
-            this.socket.emit('request-screenshare-stream');
-          }, 450);
+            this.socket.emit('guest-needs-stream');
+            // Canvas katmanını da göster
+            if (window.webrtcShare) window.webrtcShare._showLayer();
+          }, 500);
         }
       }
 

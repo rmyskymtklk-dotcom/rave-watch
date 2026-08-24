@@ -549,7 +549,10 @@ io.on('connection', (socket) => {
   socket.on('screenshare-frame', (chunk) => {
     if (!currentRoomId) return;
     const room = rooms.get(currentRoomId);
-    if (!room || room.hostId !== socket.id) return;
+    if (!room) return;
+    // Host kontrolü: server'ın tuttuğu hostId ile eşleştir
+    const isRoomHost = room.hostId === socket.id;
+    if (!isRoomHost) return;
     socket.to(currentRoomId).emit('screenshare-frame', chunk);
   });
 
@@ -557,18 +560,22 @@ io.on('connection', (socket) => {
   socket.on('screenshare-audio', (audioData) => {
     if (!currentRoomId) return;
     const room = rooms.get(currentRoomId);
-    if (!room || room.hostId !== socket.id) return;
+    if (!room) return;
+    if (room.hostId !== socket.id) return;
     socket.to(currentRoomId).emit('screenshare-audio', audioData);
   });
 
   // İzleyici akış talep ettiğinde host'a bildir
-  socket.on('guest-needs-stream', () => {
+  const handleGuestNeedsStream = () => {
     if (!currentRoomId) return;
     const room = rooms.get(currentRoomId);
     if (room && room.hostId && room.hostId !== socket.id) {
+      console.log(`[ScreenShare] İzleyici akış talep etti: ${socket.id} -> Host: ${room.hostId}`);
       io.to(room.hostId).emit('guest-needs-stream', { guestId: socket.id });
     }
-  });
+  };
+  socket.on('guest-needs-stream', handleGuestNeedsStream);
+  socket.on('request-screenshare-stream', handleGuestNeedsStream); // geriye dönük uyumluluk
 
   // Ayrılma & Bağlantı Kopması (Host Yenileme Koruması)
   socket.on('disconnect', () => {
