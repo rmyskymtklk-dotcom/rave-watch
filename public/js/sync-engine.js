@@ -725,25 +725,13 @@ class SyncEngine {
       }
     });
 
-    // 3. Mobil ses oturumunu (Active Audio Session) canlı tutma döngüsü
+    // 3. Mobil ses oturumunu güvenle aktifleştir (Sessiz ve parazitsiz)
     const unlockAudio = () => {
       try {
-        const keepAliveAudio = document.getElementById('keepalive-audio');
-        if (keepAliveAudio) {
-          keepAliveAudio.src = 'data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YRAAAAAAAAAAAAAAAAAA';
-          keepAliveAudio.play().catch(() => {});
-        }
-
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         if (AudioContext) {
           const ctx = new AudioContext();
           if (ctx.state === 'suspended') ctx.resume();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          gain.gain.value = 0.00001; // İnsan kulağının duymayacağı seviyede mobil oturumu canlı tutar
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(0);
         }
       } catch(e) {}
       document.removeEventListener('click', unlockAudio);
