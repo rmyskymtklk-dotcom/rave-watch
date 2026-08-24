@@ -851,11 +851,15 @@ html, body {
 #webrtc-video,
 #webrtc-canvas,
 .live-screen-canvas {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  object-position: center center !important;
   background: #000;
-  display: block;
+  display: block !important;
+  margin: auto !important;
 }
 
 /* Proxy Embed IFrame */
@@ -1988,7 +1992,7 @@ input:checked + .slider:before {
 .fill-screen-mode #webrtc-canvas,
 .fill-screen-mode .live-screen-canvas,
 .fill-screen-mode #html5-video {
-  object-fit: fill !important;
+  object-fit: cover !important;
   width: 100% !important;
   height: 100% !important;
 }

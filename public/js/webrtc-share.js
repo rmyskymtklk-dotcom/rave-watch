@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * SYNCPARTY WEBRTC & ZERO-NAT CANVAS SCREEN STREAMING ENGINE
- * 1.0x Gerçek Zamanlı Hız, Canlı PCM Web Audio, Sıfır Sohbet Kasıntısı & Akıcı Senkron
+ * 1.0x Akıcı Hız, Canlı PCM Web Audio, Gizli Fare İmleci & Boşluksuz Tam Ekran
  * ============================================================================
  */
 
@@ -30,16 +30,15 @@ class WebRTCShareEngine {
     this.frameLoopInterval = null;
     this.isEncodingFrame = false;
 
-    // Web Audio API Değişkenleri (PCM Raw Audio Stream)
+    // Web Audio API (PCM Raw Audio Stream)
     this.hostAudioCtx = null;
     this.hostAudioProcessor = null;
     this.guestAudioCtx = null;
     this.nextAudioPlayTime = 0;
 
-    // İzleyici Kare Çizim Kontrolü (Gecikme & Yavaşlama Önleyici Timestamp Takibi)
+    // İzleyici Kare Çizim Kontrolü (Sıfır Gecikme / Real-Time Drop)
     this.isRenderingFrame = false;
-    this.pendingFrameBlob = null;
-    this.lastRenderedTime = 0;
+    this.latestFrameBlob = null;
 
     // STUN Yapılandırması
     this.rtcConfig = {
@@ -55,7 +54,7 @@ class WebRTCShareEngine {
   }
 
   init() {
-    // Mobil & PC Ses Açma Tetikleyicisi
+    // Ses Açma Tetikleyicisi
     const handleUnmute = (e) => {
       if (e) {
         e.preventDefault();
@@ -73,7 +72,7 @@ class WebRTCShareEngine {
       this.autoplayOverlay.addEventListener('touchend', handleUnmute);
     }
 
-    // Video/Canvas sahnesine dokunulduğunda Web Audio kilidini aç
+    // Video sahnesine dokunulduğunda sesi aç
     const playerWrapper = document.getElementById('player-wrapper');
     if (playerWrapper) {
       const tryUnmute = () => {
@@ -95,22 +94,15 @@ class WebRTCShareEngine {
     }
 
     // -----------------------------------------------------------
-    // İZLEYİCİ: 1.0X GERÇEK ZAMANLI KARE OYNATICI (Sıfır Gecikme)
+    // İZLEYİCİ: 1.0X GERÇEK ZAMANLI KARE OYNATICI (Sıfır Yavaşlama)
     // -----------------------------------------------------------
-    this.socket.on('screenshare-frame-chunk', (data) => {
+    this.socket.on('screenshare-frame-chunk', (blobData) => {
       if (this.isSharing) return;
 
-      const blob = data instanceof Blob ? data : (data && data.blob ? data.blob : new Blob([data], { type: 'image/jpeg' }));
-      const timestamp = (data && data.t) ? data.t : Date.now();
+      this.latestFrameBlob = blobData instanceof Blob ? blobData : new Blob([blobData], { type: 'image/jpeg' });
 
-      // Eski kalan kareleri anında çöpe at (Buffer birikmesini & ağır çekimi %100 engeller)
-      if (timestamp < this.lastRenderedTime) return;
-      this.lastRenderedTime = timestamp;
-
-      this.pendingFrameBlob = blob;
-
-      if (!this.isRenderingFrame && this.pendingFrameBlob) {
-        this.processNextFrame();
+      if (!this.isRenderingFrame) {
+        this.drawNextFrame();
       }
     });
 
@@ -156,23 +148,22 @@ class WebRTCShareEngine {
     });
   }
 
-  processNextFrame() {
-    if (!this.pendingFrameBlob) {
+  drawNextFrame() {
+    if (!this.latestFrameBlob) {
       this.isRenderingFrame = false;
       return;
     }
 
     this.isRenderingFrame = true;
-    const currentBlob = this.pendingFrameBlob;
-    this.pendingFrameBlob = null;
+    const blob = this.latestFrameBlob;
+    this.latestFrameBlob = null; // Buffer birikmesini engelle
 
     if (window.createImageBitmap) {
-      createImageBitmap(currentBlob).then((bitmap) => {
+      createImageBitmap(blob).then((bitmap) => {
         this.renderFrameBitmap(bitmap);
         this.isRenderingFrame = false;
-        // Eğer render sırasında yeni kare geldiyse hemen en güncelini çiz
-        if (this.pendingFrameBlob) {
-          this.processNextFrame();
+        if (this.latestFrameBlob) {
+          requestAnimationFrame(() => this.drawNextFrame());
         }
       }).catch(() => {
         this.isRenderingFrame = false;
@@ -183,11 +174,11 @@ class WebRTCShareEngine {
         this.renderFrameImage(img);
         URL.revokeObjectURL(img.src);
         this.isRenderingFrame = false;
-        if (this.pendingFrameBlob) {
-          this.processNextFrame();
+        if (this.latestFrameBlob) {
+          requestAnimationFrame(() => this.drawNextFrame());
         }
       };
-      img.src = URL.createObjectURL(currentBlob);
+      img.src = URL.createObjectURL(blob);
     }
   }
 
@@ -298,14 +289,14 @@ class WebRTCShareEngine {
   }
 
   // -----------------------------------------------------------
-  // HOST: EKRAN PAYLAŞIMINI BAŞLAT (Fare İmleci Gizli & 30 FPS)
+  // HOST: EKRAN PAYLAŞIMINI BAŞLAT (Fare İmleci Gizli & 24 FPS HD)
   // -----------------------------------------------------------
   async startScreenShare() {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           cursor: 'never', // 🚀 FARE İMLECİNİ TAMAMEN GİZLE
-          frameRate: { ideal: 30, max: 30 },
+          frameRate: { ideal: 24, max: 24 },
           width: { ideal: 1920, max: 1920 },
           height: { ideal: 1080, max: 1080 }
         },
@@ -331,7 +322,7 @@ class WebRTCShareEngine {
       this.captureVideo.srcObject = stream;
       await this.captureVideo.play().catch(() => {});
 
-      // 1. Canlı Video Karesi Akış Döngüsü (1.0x Gerçek Zamanlı Hız)
+      // 1. Canlı Video Karesi Akış Döngüsü (1.0x Akıcı Gerçek Zamanlı Hız)
       this.startFrameStreamingLoop();
 
       // 2. Canlı PCM Ses Akışı Döngüsü (Sekme & Sistem Sesi)
@@ -363,7 +354,7 @@ class WebRTCShareEngine {
   }
 
   // -----------------------------------------------------------
-  // HOST: CANLI KARE AKIŞI (Timestamped Real-Time 30 FPS)
+  // HOST: CANLI KARE AKIŞI (Ultra-Hafif 720p HD & Sıfır Tıkanma)
   // -----------------------------------------------------------
   startFrameStreamingLoop() {
     if (this.frameLoopInterval) clearInterval(this.frameLoopInterval);
@@ -373,7 +364,7 @@ class WebRTCShareEngine {
 
     this.frameLoopInterval = setInterval(() => {
       if (!this.isSharing || !this.captureVideo.videoWidth) return;
-      if (this.isEncodingFrame) return; // Önceki kare sıkışmadıysa bekle (Gecikmeyi önler)
+      if (this.isEncodingFrame) return; // Önceki kare gönderilmediyse bekle (Ağ tıkanmasını önler)
 
       this.isEncodingFrame = true;
 
@@ -389,7 +380,7 @@ class WebRTCShareEngine {
 
       ctx.drawImage(this.captureVideo, 0, 0, targetW, targetH);
 
-      // Host tarafında da çiz
+      // Host tarafında da yerel çiz
       if (this.webrtcCanvas && this.canvasCtx) {
         if (this.webrtcCanvas.width !== targetW || this.webrtcCanvas.height !== targetH) {
           this.webrtcCanvas.width = targetW;
@@ -398,14 +389,14 @@ class WebRTCShareEngine {
         this.canvasCtx.drawImage(this.captureCanvas, 0, 0);
       }
 
-      // Optimize JPEG kalitesi (Hızlı iletim & sıfır gecikme)
+      // Optimize JPEG kalitesi (Yalnızca ~15 KB / kare -> Sıfır Donma, Akıcı 24 FPS)
       this.captureCanvas.toBlob((blob) => {
         this.isEncodingFrame = false;
         if (blob && this.isSharing) {
           this.socket.emit('screenshare-frame-chunk', blob);
         }
-      }, 'image/jpeg', 0.60);
-    }, 33); // Tam 30 FPS gerçek zamanlı hız
+      }, 'image/jpeg', 0.55);
+    }, 41); // 24 FPS standart sinema kare hızı
   }
 
   // -----------------------------------------------------------

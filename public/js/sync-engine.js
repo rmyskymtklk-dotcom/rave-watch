@@ -238,6 +238,17 @@ class SyncEngine {
       });
     }
 
+    const btnToggleFit = document.getElementById('btn-toggle-fit');
+    if (btnToggleFit) {
+      btnToggleFit.addEventListener('click', () => {
+        const playerWrapper = document.getElementById('player-wrapper');
+        if (playerWrapper) {
+          const isFilled = playerWrapper.classList.toggle('fill-screen-mode');
+          window.showToast(isFilled ? '📐 Ekranı Doldurma Modu: Açık (Boşluksuz Tam Ekran)' : '📐 Ekranı Sığdırma Modu: Orantılı (16:9)');
+        }
+      });
+    }
+
     this.progressContainer.addEventListener('click', (e) => {
       if (!this.canControl()) {
         window.showToast('🔒 Yalnızca oda sahibi videoyu sarabilir!');
