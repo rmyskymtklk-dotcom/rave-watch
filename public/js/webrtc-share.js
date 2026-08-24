@@ -244,8 +244,8 @@ class WebRTCShareEngine {
       const vw = this.captureVideo.videoWidth;
       const vh = this.captureVideo.videoHeight;
 
-      // Akıcı ve optimize 960px genişlik
-      const scale = Math.min(1, 960 / vw);
+      // 💎 1080p Full HD Kristal Netlikte Ölçeklendirme
+      const scale = Math.min(1, 1920 / vw);
       const tw = Math.round(vw * scale);
       const th = Math.round(vh * scale);
 
@@ -264,14 +264,15 @@ class WebRTCShareEngine {
         this.ctx.drawImage(this.outCanvas, 0, 0);
       }
 
+      // 💎 Yüksek Kaliteli 0.80 JPEG (Altyazılar, animeler ve detaylar cam gibi net)
       this.outCanvas.toBlob((blob) => {
         this.isEncoding = false;
         if (blob && this.isSharing) {
           this.lastEncodedBlob = blob;
           this.socket.emit('screenshare-frame', blob);
         }
-      }, 'image/jpeg', 0.65);
-    }, 33); // ~30 FPS
+      }, 'image/jpeg', 0.80);
+    }, 33); // 30 FPS akıcı ve yüksek kaliteli akış
   }
 
   // ================================================================

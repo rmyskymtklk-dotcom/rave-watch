@@ -857,37 +857,50 @@ html, body {
 
 /* HTML5 Video */
 #html5-video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #000;
-  display: block;
-}
-
-/* WebRTC canvas ve donanımsal video - Sıfır Boşluk & Tam Merkezleme */
-#webrtc-canvas,
-.live-screen-canvas {
   width: 100% !important;
   height: 100% !important;
   object-fit: contain;
   background: #000;
   display: block;
-  margin: auto;
+}
+
+/* WebRTC canvas ve donanımsal video - Sıfır Boşluklu Tam Ekran Yayılımı */
+#webrtc-canvas,
+.live-screen-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  background: #000;
+  display: block;
 }
 
 #webrtc-video {
   width: 100% !important;
   height: 100% !important;
-  object-fit: contain;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: cover !important;
+  object-position: center center !important;
   background: #000;
   display: block;
-  margin: auto;
+}
+
+/* Orijinal Orana Dönüş Modu */
+.contain-mode #webrtc-video,
+.contain-mode #webrtc-canvas,
+.contain-mode .live-screen-canvas,
+.contain-mode #html5-video {
+  object-fit: contain !important;
 }
 
 /* Ekranı Doldur Modu (Boşluksuz Tam Ekran) */
 .fill-screen-mode #webrtc-video,
 .fill-screen-mode #webrtc-canvas,
-.fill-screen-mode .live-screen-canvas {
+.fill-screen-mode .live-screen-canvas,
+.fill-screen-mode #html5-video {
   object-fit: cover !important;
 }
 
