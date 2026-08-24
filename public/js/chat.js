@@ -154,6 +154,21 @@ class ChatEngine {
         this.setReplyTarget(msg);
       });
 
+      // Mesaja tıklayarak da doğrudan yanıtla
+      bubble.addEventListener('dblclick', () => {
+        this.setReplyTarget(msg);
+      });
+
+      // Mobil için mesaja dokunulduğunda yanıtla seçeneği
+      let touchTimer;
+      bubble.addEventListener('touchstart', () => {
+        touchTimer = setTimeout(() => {
+          this.setReplyTarget(msg);
+          window.showToast(`💬 ${msg.username} yanıtlanıyor...`);
+        }, 500);
+      }, { passive: true });
+      bubble.addEventListener('touchend', () => clearTimeout(touchTimer), { passive: true });
+
       bubble.appendChild(senderRow);
       bubble.appendChild(textDiv);
       bubble.appendChild(replyBtn);

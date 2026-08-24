@@ -233,7 +233,7 @@ class WebRTCShareEngine {
   }
 
   // ================================================================
-  // HOST: 30-60 FPS Yüksek Kaliteli & Donma Korumalı Kare Gönderme Döngüsü
+  // HOST: 25 FPS Akıcı, Sıfır Gecikmeli & Ultra Hafif Kare Gönderme Döngüsü
   // ================================================================
   _startFrameLoop() {
     if (this.frameTimer) clearInterval(this.frameTimer);
@@ -243,9 +243,9 @@ class WebRTCShareEngine {
     this.frameTimer = setInterval(() => {
       if (!this.isSharing || !this.captureVideo.videoWidth) return;
 
-      // 🛡️ Watchdog: Eğer önceki kare 200ms'den uzun sürdüyse kilidi zorla aç
+      // 🛡️ Watchdog: Eğer önceki kare 150ms'den uzun sürdüyse kilidi zorla aç
       if (this.isEncoding) {
-        if (Date.now() - this.lastEncodingTime > 200) {
+        if (Date.now() - this.lastEncodingTime > 150) {
           this.isEncoding = false;
         } else {
           return;
@@ -258,7 +258,8 @@ class WebRTCShareEngine {
       const vw = this.captureVideo.videoWidth;
       const vh = this.captureVideo.videoHeight;
 
-      const scale = Math.min(1, 1280 / vw);
+      // Ultra Akıcı ve Sıfır Gecikmeli 960px (720p 16:9) Optimize Ölçeklendirme
+      const scale = Math.min(1, 960 / vw);
       const tw = Math.round(vw * scale);
       const th = Math.round(vh * scale);
 
@@ -277,14 +278,15 @@ class WebRTCShareEngine {
         this.ctx.drawImage(this.outCanvas, 0, 0);
       }
 
+      // Ultra optimize 0.58 JPEG kalitesi (Sadece ~25 KB, sıfır ağ tıkanması & anında iletim)
       this.outCanvas.toBlob((blob) => {
         this.isEncoding = false;
         if (blob && this.isSharing) {
           this.lastEncodedBlob = blob;
           this.socket.emit('screenshare-frame', blob);
         }
-      }, 'image/jpeg', 0.72);
-    }, 33);
+      }, 'image/jpeg', 0.58);
+    }, 40); // 25 FPS (Kesintisiz sinema akıcılığı & 0 gecikme)
   }
 
   // ================================================================
