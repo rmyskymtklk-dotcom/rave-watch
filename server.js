@@ -489,16 +489,23 @@ io.on('connection', (socket) => {
 
   // Canlı Sohbet Mesajı (Yanıt Verme / Quote Destekli)
   socket.on('chat-message', ({ text, replyTo }) => {
-    if (!currentRoomId || !currentUser || !text) return;
+    if (!currentRoomId || !text) return;
     const trimmed = text.trim();
     if (trimmed.length === 0) return;
+
+    const room = rooms.get(currentRoomId);
+    const user = currentUser || (room && room.users ? room.users.get(socket.id) : null) || {
+      username: 'İzleyici',
+      avatarColor: '#b3001e',
+      isHost: room && room.hostId === socket.id
+    };
 
     const messageData = {
       id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       userId: socket.id,
-      username: currentUser.username,
-      avatarColor: currentUser.avatarColor,
-      isHost: currentUser.isHost,
+      username: user.username,
+      avatarColor: user.avatarColor,
+      isHost: user.isHost,
       text: trimmed,
       replyTo: replyTo ? {
         id: replyTo.id,

@@ -29,8 +29,11 @@ class WebRTCShareEngine {
     // Çerçeve Döngüsü ve Çizim Durumu
     this.frameTimer = null;
     this.isEncoding = false;
+    this.lastEncodingTime = 0;
+    this.lastEncodedBlob = null;
     this.latestFrame = null;
     this.isDrawing = false;
+    this.lastDrawTime = 0;
 
     // Yüksek Kazançlı Ses Sistemi (İzleyici)
     this.guestAudioCtx = null;
@@ -131,13 +134,19 @@ class WebRTCShareEngine {
     this.socket.on('user-joined', ({ user }) => {
       if (this.isSharing && this.localStream && user.id !== this.socket.id) {
         this._createPeer(user.id, true);
+        if (this.lastEncodedBlob) {
+          this.socket.emit('screenshare-frame', this.lastEncodedBlob);
+        }
       }
     });
 
-    // ─── İzleyici Akış İstediğinde ───
+    // ─── İzleyici Akış İstediğinde (Sonradan Katılan İzleyiciye Anında Ekran Gönder) ───
     this.socket.on('guest-needs-stream', ({ guestId }) => {
       if (this.isSharing && this.localStream) {
         this._createPeer(guestId, true);
+        if (this.lastEncodedBlob) {
+          this.socket.emit('screenshare-frame', this.lastEncodedBlob);
+        }
       }
     });
   }
@@ -154,7 +163,6 @@ class WebRTCShareEngine {
   // HOST: Kullanıcıyı Bilgilendir ve Ekran Paylaşımını Başlat
   // ================================================================
   _promptAndStartShare() {
-    // Kullanıcıya rehber bildirimi göster
     window.showToast('🎬 İpucu: Açılan pencerede "SEKME" seçip "Sekme Sesini Paylaş" kutusunu işaretleyin.');
     setTimeout(() => {
       this._startShare();
@@ -163,11 +171,10 @@ class WebRTCShareEngine {
 
   async _startShare() {
     try {
-      // 🚀 Sekme izolasyonu, imleç gizleme ve kristal netliğinde sekme sesi
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           cursor: 'never', // Fare imlecini tamamen yok et
-          displaySurface: 'browser', // Öncelikli sekme paylaşımı
+          displaySurface: 'browser',
           frameRate: { ideal: 30, max: 60 },
           width: { ideal: 1920, max: 2560 },
           height: { ideal: 1080, max: 1440 }
@@ -187,17 +194,12 @@ class WebRTCShareEngine {
       this.localStream = stream;
       this.isSharing = true;
 
-      // captureVideo ile akışı başlat
       this.captureVideo.srcObject = stream;
       await this.captureVideo.play().catch(() => {});
 
-      // Katmanı göster
       this._showLayer();
-
-      // Kare gönderme döngüsünü başlat
       this._startFrameLoop();
 
-      // Ses Yakalama Kontrolü
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length > 0) {
         this._startAudioCapture(stream);
@@ -206,26 +208,21 @@ class WebRTCShareEngine {
         window.showToast('⚠️ Ses Gitmiyor: "Sekme Sesini Paylaş" kutusunu işaretleyerek yeniden başlatın.');
       }
 
-      // UI Güncelle
       if (this.shareBtn) {
         this.shareBtn.classList.add('btn-primary');
         this.shareBtn.classList.remove('btn-secondary-sm');
       }
       if (this.shareBtnText) this.shareBtnText.textContent = 'Paylaşımı Durdur';
 
-      // Sunucuya yayın durumunu ilet
       this.socket.emit('screenshare-status', { active: true });
 
-      // Odadaki tüm izleyicilere WebRTC bağlantısı aç
       if (window.roomEngine && window.roomEngine.users) {
         window.roomEngine.users.forEach(u => {
           if (u.id !== this.socket.id) this._createPeer(u.id, true);
         });
       }
 
-      // Kullanıcı tarayıcı arayüzünden paylaşımı durdurursa
       stream.getVideoTracks()[0].onended = () => this._stopShare();
-
       window.showToast('🚀 Ekran ve film yayını başladı!');
     } catch (err) {
       console.warn('Ekran paylaşımı başlatılamadı:', err);
@@ -236,22 +233,31 @@ class WebRTCShareEngine {
   }
 
   // ================================================================
-  // HOST: 30-60 FPS Yüksek Kaliteli Kare Gönderme Döngüsü
+  // HOST: 30-60 FPS Yüksek Kaliteli & Donma Korumalı Kare Gönderme Döngüsü
   // ================================================================
   _startFrameLoop() {
     if (this.frameTimer) clearInterval(this.frameTimer);
     this.isEncoding = false;
+    this.lastEncodingTime = Date.now();
 
     this.frameTimer = setInterval(() => {
       if (!this.isSharing || !this.captureVideo.videoWidth) return;
-      if (this.isEncoding) return;
+
+      // 🛡️ Watchdog: Eğer önceki kare 200ms'den uzun sürdüyse kilidi zorla aç
+      if (this.isEncoding) {
+        if (Date.now() - this.lastEncodingTime > 200) {
+          this.isEncoding = false;
+        } else {
+          return;
+        }
+      }
 
       this.isEncoding = true;
+      this.lastEncodingTime = Date.now();
 
       const vw = this.captureVideo.videoWidth;
       const vh = this.captureVideo.videoHeight;
 
-      // Akıcı ve net 1080p ölçeklendirme
       const scale = Math.min(1, 1280 / vw);
       const tw = Math.round(vw * scale);
       const th = Math.round(vh * scale);
@@ -274,10 +280,11 @@ class WebRTCShareEngine {
       this.outCanvas.toBlob((blob) => {
         this.isEncoding = false;
         if (blob && this.isSharing) {
+          this.lastEncodedBlob = blob;
           this.socket.emit('screenshare-frame', blob);
         }
-      }, 'image/jpeg', 0.75);
-    }, 33); // ~30 FPS
+      }, 'image/jpeg', 0.72);
+    }, 33);
   }
 
   // ================================================================
@@ -289,11 +296,9 @@ class WebRTCShareEngine {
       this.hostAudioCtx = new AC();
       this.hostSource = this.hostAudioCtx.createMediaStreamSource(stream);
 
-      // 4096 buffer ile kesintisiz pürüzsüz ses
       this.hostProc = this.hostAudioCtx.createScriptProcessor(4096, 1, 1);
       this.hostSource.connect(this.hostProc);
 
-      // Chrome'un ses nodunu sessiz diye durdurmasını engellemek için destination'a bağla
       const dummyGain = this.hostAudioCtx.createGain();
       dummyGain.gain.value = 0.0001;
       this.hostProc.connect(dummyGain);
@@ -330,6 +335,7 @@ class WebRTCShareEngine {
     this.peerConnections.forEach(pc => { try { pc.close(); } catch(e){} });
     this.peerConnections.clear();
     this.isSharing = false;
+    this.lastEncodedBlob = null;
 
     if (this.shareBtn) {
       this.shareBtn.classList.remove('btn-primary');
@@ -343,17 +349,35 @@ class WebRTCShareEngine {
   }
 
   // ================================================================
-  // İZLEYİCİ: En Güncel Kareyi Çiz (Gecikmesiz Canlı Akış)
+  // İZLEYİCİ: En Güncel Kareyi Çiz (Donma Korumalı & Kesintisiz)
   // ================================================================
   _drawFrame() {
-    if (!this.latestFrame) { this.isDrawing = false; return; }
+    if (!this.latestFrame) {
+      this.isDrawing = false;
+      return;
+    }
+
+    if (this.isDrawing) {
+      if (Date.now() - this.lastDrawTime > 250) {
+        this.isDrawing = false;
+      } else {
+        return;
+      }
+    }
+
     this.isDrawing = true;
+    this.lastDrawTime = Date.now();
+
     const blob = this.latestFrame;
     this.latestFrame = null;
 
     if (window.createImageBitmap) {
       createImageBitmap(blob).then(bmp => {
-        if (!this.canvas || !this.ctx) { bmp.close(); this.isDrawing = false; return; }
+        if (!this.canvas || !this.ctx) {
+          bmp.close();
+          this.isDrawing = false;
+          return;
+        }
         if (this.canvas.width !== bmp.width || this.canvas.height !== bmp.height) {
           this.canvas.width = bmp.width;
           this.canvas.height = bmp.height;
@@ -361,13 +385,24 @@ class WebRTCShareEngine {
         this.ctx.drawImage(bmp, 0, 0);
         bmp.close();
         this.isDrawing = false;
-        if (this.latestFrame) requestAnimationFrame(() => this._drawFrame());
-      }).catch(() => { this.isDrawing = false; });
+        if (this.latestFrame) {
+          requestAnimationFrame(() => this._drawFrame());
+        }
+      }).catch(() => {
+        this.isDrawing = false;
+        if (this.latestFrame) {
+          requestAnimationFrame(() => this._drawFrame());
+        }
+      });
     } else {
       const img = new Image();
       const url = URL.createObjectURL(blob);
       img.onload = () => {
-        if (!this.canvas || !this.ctx) { URL.revokeObjectURL(url); this.isDrawing = false; return; }
+        if (!this.canvas || !this.ctx) {
+          URL.revokeObjectURL(url);
+          this.isDrawing = false;
+          return;
+        }
         if (this.canvas.width !== img.naturalWidth || this.canvas.height !== img.naturalHeight) {
           this.canvas.width = img.naturalWidth;
           this.canvas.height = img.naturalHeight;
@@ -375,7 +410,13 @@ class WebRTCShareEngine {
         this.ctx.drawImage(img, 0, 0);
         URL.revokeObjectURL(url);
         this.isDrawing = false;
-        if (this.latestFrame) requestAnimationFrame(() => this._drawFrame());
+        if (this.latestFrame) {
+          requestAnimationFrame(() => this._drawFrame());
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        this.isDrawing = false;
       };
       img.src = url;
     }

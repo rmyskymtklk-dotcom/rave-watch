@@ -83,7 +83,7 @@
             <i class="fa-solid fa-plus"></i>
           </div>
           <h3 class="action-title">Yeni Oda Oluştur</h3>
-          <p class="action-desc">4 Haneli (2 Harf + 2 Sayı) özel oda oluşturun.</p>
+          <p class="action-desc">Arkadaşlarınızla anında birlikte izleyin.</p>
           <button class="cyber-btn btn-primary" id="create-room-btn">
             <i class="fa-solid fa-play"></i> Hemen Başlat
           </button>
@@ -95,9 +95,9 @@
             <i class="fa-solid fa-right-to-bracket"></i>
           </div>
           <h3 class="action-title">Odaya Katıl</h3>
-          <p class="action-desc">Arkadaşınızın 4 haneli oda kodunu girin.</p>
+          <p class="action-desc">Arkadaşınızın oda kodunu girin.</p>
           <div class="input-group">
-            <input type="text" id="room-code-input" class="cyber-input code-input" placeholder="Kod (Örn: AB42)" maxlength="8" style="text-transform: uppercase;">
+            <input type="text" id="room-code-input" class="cyber-input code-input" placeholder="Oda Kodu (Örn: AB42)" maxlength="12" style="text-transform: uppercase;">
             <button class="cyber-btn btn-secondary" id="join-room-btn">
               <i class="fa-solid fa-arrow-right"></i> Katıl
             </button>
@@ -192,7 +192,6 @@
     if (savedName) usernameInput.value = savedName;
     else usernameInput.value = generateRandomName();
 
-    // Kayıtlı rengi uygula ve aktif yap
     applyAccentColor(selectedColor);
     colorDots.forEach(dot => {
       dot.classList.toggle('active', dot.dataset.color === selectedColor);
@@ -218,7 +217,7 @@
       return { username, selectedColor };
     }
 
-    // Yeni 4 Haneli Oda Başlat
+    // Yeni Oda Başlat (Host Olarak)
     document.getElementById('create-room-btn').addEventListener('click', () => {
       saveProfile();
       const code = generate4CharRoomCode();
@@ -226,20 +225,29 @@
       window.location.href = `/room/${code}`;
     });
 
-    // Odaya Katıl
+    // Var Olan Odaya Katıl (Doğrudan İzleyici Olarak)
     document.getElementById('join-room-btn').addEventListener('click', () => {
       saveProfile();
-      const code = document.getElementById('room-code-input').value.trim().toUpperCase();
-      if (!code) {
-        alert('Lütfen geçerli bir oda kodu girin!');
+      const inputVal = document.getElementById('room-code-input').value.trim().toUpperCase();
+      if (!inputVal) {
+        alert('Lütfen katılmak istediğiniz oda kodunu girin!');
         return;
       }
-      let cleanCode = code;
+      let cleanCode = inputVal;
       if (cleanCode.includes('/ROOM/')) {
         cleanCode = cleanCode.split('/ROOM/')[1];
       }
       cleanCode = cleanCode.replace(/[^A-Z0-9_-]/gi, '');
+
+      // Odaya katılırken host flag'ini temizle ki kesinlikle izleyici olarak girsin
+      sessionStorage.removeItem('sync_room_host_' + cleanCode.toLowerCase());
       window.location.href = `/room/${cleanCode}`;
+    });
+
+    document.getElementById('room-code-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('join-room-btn').click();
+      }
     });
 
     document.getElementById('room-code-input').addEventListener('keypress', (e) => {

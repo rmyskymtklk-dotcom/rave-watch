@@ -136,15 +136,18 @@ class RoomEngine {
 
     document.getElementById('display-room-code').textContent = this.roomId;
 
-    // Davet Bağlantısı Kopyalama
-    document.getElementById('btn-copy-link').addEventListener('click', () => {
-      const inviteUrl = window.location.href;
-      navigator.clipboard.writeText(inviteUrl).then(() => {
-        window.showToast('📋 Davet bağlantısı kopyalandı!');
-      }).catch(() => {
-        window.showToast('Link: ' + inviteUrl);
+    // Oda Kodunu Kopyalama (Yalnızca 4 Haneli Kodu Kopyalar)
+    const copyBtn = document.getElementById('btn-copy-link');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        const code = this.roomId;
+        navigator.clipboard.writeText(code).then(() => {
+          window.showToast(`📋 Oda kodu kopyalandı: ${code}`);
+        }).catch(() => {
+          window.showToast('Oda Kodu: ' + code);
+        });
       });
-    });
+    }
 
     // Ekranı Tam Doldurma / Boşluk Doldur Butonu (Fill / Contain Toggle)
     const fitBtn = document.getElementById('btn-toggle-fit');
