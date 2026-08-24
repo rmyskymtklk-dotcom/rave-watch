@@ -846,17 +846,18 @@ html, body {
   font-size: 0.9rem;
 }
 
-/* HTML5 & WebRTC Video ve Canvas Elemanları (Boşluksuz Tam Ekran) */
+/* HTML5 & WebRTC Video ve Canvas Elemanları (Dengeli Sinema Formatı) */
 #html5-video,
 #webrtc-video,
 #webrtc-canvas,
 .live-screen-canvas {
   width: 100% !important;
   height: 100% !important;
-  object-fit: fill !important;
+  object-fit: contain !important;
+  object-position: center center !important;
   background: #000;
   display: block !important;
-  margin: 0 !important;
+  margin: auto !important;
   padding: 0 !important;
 }
 
