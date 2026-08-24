@@ -427,12 +427,28 @@ class SyncEngine {
       document.getElementById('webrtc-player-container').classList.remove('hidden');
     }
 
-    // Canlı yayında (WebRTC) Scrubber çubuğunu gizle
+    // Gömülü Iframe (Embed) ve Canlı Yayında (WebRTC) çakışan kontrolleri gizle
+    const controlsLeft = document.querySelector('.controls-left');
     if (this.progressContainer) {
-      if (this.currentMediaType === 'webrtc') {
+      if (this.currentMediaType === 'webrtc' || this.currentMediaType === 'embed') {
         this.progressContainer.style.display = 'none';
       } else {
         this.progressContainer.style.display = 'block';
+      }
+    }
+
+    if (controlsLeft) {
+      if (this.currentMediaType === 'embed') {
+        // Embed modunda harici sitenin kendi kontrolleri kullanılacağı için sol çubuğu sadeleştir
+        const playBtn = document.getElementById('ctrl-play-pause');
+        const timeDisp = document.querySelector('.time-display');
+        if (playBtn) playBtn.style.display = 'none';
+        if (timeDisp) timeDisp.style.display = 'none';
+      } else {
+        const playBtn = document.getElementById('ctrl-play-pause');
+        const timeDisp = document.querySelector('.time-display');
+        if (playBtn) playBtn.style.display = 'flex';
+        if (timeDisp) timeDisp.style.display = 'flex';
       }
     }
 
