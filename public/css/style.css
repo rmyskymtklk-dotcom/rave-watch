@@ -846,19 +846,42 @@ html, body {
   font-size: 0.9rem;
 }
 
-/* HTML5 & WebRTC Video ve Canvas Elemanları (Dengeli Sinema Formatı) */
-#html5-video,
-#webrtc-video,
+/* HTML5 & WebRTC Video ve Canvas Elemanları */
+#html5-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  display: block;
+}
+
+/* WebRTC oynatıcı: canvas ve video container'ı tam kaplasın */
+#webrtc-player-container {
+  position: relative;
+  background: #000;
+}
+
 #webrtc-canvas,
 .live-screen-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100% !important;
   height: 100% !important;
-  object-fit: contain !important;
-  object-position: center center !important;
+  display: block;
   background: #000;
-  display: block !important;
-  margin: auto !important;
-  padding: 0 !important;
+  object-fit: contain;
+}
+
+#webrtc-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+  background: #000;
+  display: block;
 }
 
 /* Proxy Embed IFrame */

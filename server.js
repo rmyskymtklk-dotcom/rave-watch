@@ -514,19 +514,9 @@ io.on('connection', (socket) => {
   // WebRTC Sinyalleşmesi (Ekran & Sekme Sesi Paylaşımı)
   socket.on('webrtc-signal', ({ targetId, signal, type }) => {
     if (targetId) {
-      // Birebir sinyalleşme
-      io.to(targetId).emit('webrtc-signal', {
-        senderId: socket.id,
-        signal,
-        type
-      });
+      io.to(targetId).emit('webrtc-signal', { senderId: socket.id, signal, type });
     } else if (currentRoomId) {
-      // Odaya yayın
-      socket.to(currentRoomId).emit('webrtc-signal', {
-        senderId: socket.id,
-        signal,
-        type
-      });
+      socket.to(currentRoomId).emit('webrtc-signal', { senderId: socket.id, signal, type });
     }
   });
 
@@ -534,6 +524,7 @@ io.on('connection', (socket) => {
   socket.on('screenshare-status', ({ active }) => {
     if (!currentRoomId) return;
     const room = rooms.get(currentRoomId);
+    // hostId kontrolü (isHost flag'ine güvenme — sadece server'ın tuttuğu hostId'e güven)
     if (!room || room.hostId !== socket.id) return;
 
     if (active) {
@@ -546,30 +537,36 @@ io.on('connection', (socket) => {
       room.media.title = '🎬 Henüz bir video veya film seçilmedi';
     }
 
-    io.to(currentRoomId).emit('screenshare-status-update', {
+    // Sadece diğer kullanıcılara bildir (host kendisi zaten biliyor)
+    socket.to(currentRoomId).emit('screenshare-status-update', {
       active,
       media: room.media
     });
+    console.log(`[ScreenShare] ${active ? 'Başladı' : 'Bitti'}: Oda ${currentRoomId}, Host: ${socket.id}`);
   });
 
-  // Canlı Ekran Video Karesi Rölesi (Zero-NAT Anında İletim)
-  socket.on('screenshare-frame-chunk', (chunk) => {
-    if (!currentRoomId || !currentUser || !currentUser.isHost) return;
-    socket.to(currentRoomId).emit('screenshare-frame-chunk', chunk);
+  // Yeni Canvas Kare Rölesi (host -> tüm izleyiciler)
+  socket.on('screenshare-frame', (chunk) => {
+    if (!currentRoomId) return;
+    const room = rooms.get(currentRoomId);
+    if (!room || room.hostId !== socket.id) return;
+    socket.to(currentRoomId).emit('screenshare-frame', chunk);
   });
 
-  // Canlı Ekran Ham Ses (PCM Web Audio) Rölesi
-  socket.on('screenshare-audio-raw', (audioData) => {
-    if (!currentRoomId || !currentUser || !currentUser.isHost) return;
-    socket.to(currentRoomId).emit('screenshare-audio-raw', audioData);
+  // PCM Ses Rölesi (host -> tüm izleyiciler)
+  socket.on('screenshare-audio', (audioData) => {
+    if (!currentRoomId) return;
+    const room = rooms.get(currentRoomId);
+    if (!room || room.hostId !== socket.id) return;
+    socket.to(currentRoomId).emit('screenshare-audio', audioData);
   });
 
-  // İzleyici Ekran Akışını Talep Ettiğinde (Yeniden Bağlantı Garantisi)
-  socket.on('request-screenshare-stream', () => {
+  // İzleyici akış talep ettiğinde host'a bildir
+  socket.on('guest-needs-stream', () => {
     if (!currentRoomId) return;
     const room = rooms.get(currentRoomId);
     if (room && room.hostId && room.hostId !== socket.id) {
-      io.to(room.hostId).emit('guest-requested-screenshare', { guestId: socket.id });
+      io.to(room.hostId).emit('guest-needs-stream', { guestId: socket.id });
     }
   });
 
