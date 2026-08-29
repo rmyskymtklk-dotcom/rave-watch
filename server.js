@@ -197,7 +197,7 @@ app.get('/api/proxy-embed', async (req, res) => {
       html = html.replace(/parent\.location/gi, 'window.location');
       html = html.replace(/top\.location\s*=/gi, '/* fb */ window.location =');
 
-      // Tüm mutlak ve göreli URL'leri proxy üzerinden yeniden yaz
+      // Tüm mutlak ve göreli URL'leri, iframeleri ve kaynakları proxy üzerinden yeniden yaz
       const rewriteUrl = (url) => {
         if (!url || url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('#') || url.startsWith('javascript:')) return url;
         if (url.startsWith('//')) url = parsedUrl.protocol + url;
@@ -206,7 +206,7 @@ app.get('/api/proxy-embed', async (req, res) => {
         return proxyBase + encodeURIComponent(url);
       };
 
-      html = html.replace(/\b(href|src|action)=["']([^"'#][^"']*?)["']/gi, (match, attr, url) => {
+      html = html.replace(/\b(href|src|action|data-src|data-url|data-player|data-embed)=["']([^"'#][^"']*?)["']/gi, (match, attr, url) => {
         return `${attr}="${rewriteUrl(url)}"`;
       });
 
@@ -222,26 +222,73 @@ app.get('/api/proxy-embed', async (req, res) => {
     window.open = () => null;
   } catch(e) {}
 
-  // İleri-Geri Sarmayı Engelleyen Akıllı Güvenlik (Oynat/Duraklat Serbest)
+  // İleri-Geri Sarmayı Kökten Engelleyen Güvenlik Motoru (Oynat/Duraklat ve Sayfa Kaydırma Serbest)
   (function() {
     let lastValidTime = 0;
-    let isResetting = false;
+    let isInternalSetting = false;
+
+    try {
+      const originalCurrentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime');
+      if (originalCurrentTime && originalCurrentTime.set) {
+        Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
+          get: function() {
+            return originalCurrentTime.get.call(this);
+          },
+          set: function(val) {
+            if (isInternalSetting) {
+              return originalCurrentTime.set.call(this, val);
+            }
+            const current = originalCurrentTime.get.call(this);
+            if (Math.abs(val - current) > 0.8) {
+              return;
+            }
+            return originalCurrentTime.set.call(this, val);
+          },
+          configurable: true
+        });
+      }
+    } catch(e) {}
+
+    try {
+      if (HTMLMediaElement.prototype.fastSeek) {
+        HTMLMediaElement.prototype.fastSeek = function() {};
+      }
+    } catch(e) {}
 
     document.addEventListener('timeupdate', function(e) {
-      if (e.target && e.target.tagName === 'VIDEO' && !isResetting) {
+      if (e.target && e.target.tagName === 'VIDEO' && !isInternalSetting) {
         lastValidTime = e.target.currentTime;
       }
     }, true);
 
     document.addEventListener('seeking', function(e) {
       const vid = e.target;
-      if (vid && vid.tagName === 'VIDEO' && !isResetting) {
+      if (vid && vid.tagName === 'VIDEO' && !isInternalSetting) {
         const diff = Math.abs(vid.currentTime - lastValidTime);
-        if (diff > 1.2) {
-          isResetting = true;
+        if (diff > 0.8) {
+          isInternalSetting = true;
           vid.currentTime = lastValidTime;
-          setTimeout(() => { isResetting = false; }, 100);
+          setTimeout(() => { isInternalSetting = false; }, 80);
         }
+      }
+    }, true);
+
+    // İlerleme barlarına mousedown / pointerdown olaylarını yut (Oynat/Duraklat Serbest)
+    document.addEventListener('pointerdown', function(e) {
+      const target = e.target;
+      if (!target) return;
+      const cls = (target.className && typeof target.className === 'string') ? target.className.toLowerCase() : '';
+      const id = (target.id && typeof target.id === 'string') ? target.id.toLowerCase() : '';
+      const aria = (target.getAttribute && target.getAttribute('aria-label')) ? target.getAttribute('aria-label').toLowerCase() : '';
+      
+      const isTimeline = cls.includes('progress') || cls.includes('scrubber') || cls.includes('seek') || cls.includes('timeline') || cls.includes('slider-time') || cls.includes('bar-wrap') || id.includes('progress') || id.includes('scrubber') || id.includes('seek') || id.includes('timeline') || aria.includes('seek') || aria.includes('progress') || aria.includes('sar');
+      
+      const isPlayBtn = cls.includes('play') || cls.includes('pause') || id.includes('play') || id.includes('pause') || aria.includes('play') || aria.includes('oynat');
+
+      if (isTimeline && !isPlayBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
       }
     }, true);
 
@@ -266,12 +313,16 @@ app.get('/api/proxy-embed', async (req, res) => {
     -webkit-overflow-scrolling: touch !important; 
   }
 
-  /* Progress/Timeline İlerleme Barlarına Tıklamayı Engelle (Oynat/Duraklat ve Diğer Butonlar Serbesttir) */
+  /* Progress/Timeline İlerleme Barlarına Tıklamayı Kökten Engelle (Oynat/Duraklat ve Diğer Butonlar Serbesttir) */
   .jw-slider-time, .vjs-progress-control, .plyr__progress, .timeline-bar,
   .player-progress, [class*="progress-bar"], [class*="scrubber"], [class*="seek-bar"],
   [class*="timeline"], [id*="progress-bar"], [id*="scrubber"], [id*="seek-bar"],
   .jw-display-icon-rewind, .jw-display-icon-forward, [class*="forward-10"], [class*="rewind-10"],
-  [class*="skip-forward"], [class*="skip-back"], [aria-label*="Seek"], [aria-label*="Sar"] {
+  [class*="skip-forward"], [class*="skip-back"], [aria-label*="Seek"], [aria-label*="Sar"],
+  .vjs-play-progress, .vjs-progress-holder, .jw-progress, .jw-buffer,
+  [class*="progress-holder"], [class*="progress-container"], [id*="progress-holder"],
+  .art-control-progress, .dplayer-bar-wrap, .dplayer-bar, .plyr__progress__buffer,
+  [class*="range"], input[type="range"][class*="seek"], input[type="range"][class*="progress"] {
     pointer-events: none !important;
     cursor: not-allowed !important;
   }
