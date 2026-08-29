@@ -124,9 +124,9 @@ app.get('/api/proxy-embed', async (req, res) => {
 </script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{width:100%;height:100%;background:#000;overflow:hidden;}
-  iframe{width:100%;height:100%;border:none;display:block;}
-  .loader{position:fixed;inset:0;background:#091319;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#d9bf87;font-family:sans-serif;gap:16px;transition:opacity 0.5s;}
+  html,body{width:100%;min-height:100%;background:#000;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  iframe{width:100%;height:100vh;min-height:100%;border:none;display:block;}
+  .loader{position:fixed;inset:0;background:#091319;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#d9bf87;font-family:sans-serif;gap:16px;transition:opacity 0.5s;z-index:99;}
   .loader.fade{opacity:0;pointer-events:none;}
   .spinner{width:44px;height:44px;border:3px solid rgba(217,191,135,0.2);border-top-color:#d9bf87;border-radius:50%;animation:spin 0.8s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -218,12 +218,9 @@ app.get('/api/proxy-embed', async (req, res) => {
   } catch(e) {}
 </script>
 <style>
-  html, body { width:100%!important; height:100%!important; margin:0!important; padding:0!important; background:#000!important; overflow:hidden!important; }
-  video, #player, .jwplayer, .video-js, .plyr, .player-container, [id*="player"], [class*="player"] {
-    width:100%!important; height:100%!important; max-width:100vw!important; max-height:100vh!important;
-  }
-  .ad-box,.banner-ad,[class*="reklam"],[id*="reklam"],#popunder,.popunder,[class*="popup"],[id*="popup"],
-  .cookie-notice,.gdpr-bar,.notice-bar { display:none!important; }
+  html, body { width: 100% !important; min-height: 100% !important; margin: 0 !important; padding: 0 !important; background: #000 !important; overflow-x: hidden !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; }
+  .ad-box, .banner-ad, [class*="reklam"], [id*="reklam"], #popunder, .popunder, [class*="popup"], [id*="popup"],
+  .cookie-notice, .gdpr-bar, .notice-bar { display: none !important; }
 </style>`;
 
       if (html.includes('<head>')) {
@@ -647,24 +644,23 @@ io.on('connection', (socket) => {
     console.log(`[ScreenShare] ${active ? 'Başladı' : 'Bitti'}: Oda ${currentRoomId}, Host: ${socket.id}`);
   });
 
-  // Yeni Canvas Kare Rölesi (host -> tüm izleyiciler)
+  // Yeni Canvas Kare Rölesi (host -> tüm izleyiciler, 0 Gecikme volatile emit)
   socket.on('screenshare-frame', (chunk) => {
     if (!currentRoomId) return;
     const room = rooms.get(currentRoomId);
     if (!room) return;
-    // Host kontrolü: server'ın tuttuğu hostId ile eşleştir
     const isRoomHost = room.hostId === socket.id;
     if (!isRoomHost) return;
-    socket.to(currentRoomId).emit('screenshare-frame', chunk);
+    socket.to(currentRoomId).volatile.emit('screenshare-frame', chunk);
   });
 
-  // PCM Ses Rölesi (host -> tüm izleyiciler)
+  // PCM Ses Rölesi (host -> tüm izleyiciler, 0 Gecikme volatile emit)
   socket.on('screenshare-audio', (audioData) => {
     if (!currentRoomId) return;
     const room = rooms.get(currentRoomId);
     if (!room) return;
     if (room.hostId !== socket.id) return;
-    socket.to(currentRoomId).emit('screenshare-audio', audioData);
+    socket.to(currentRoomId).volatile.emit('screenshare-audio', audioData);
   });
 
   // İzleyici akış talep ettiğinde host'a bildir

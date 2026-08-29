@@ -228,7 +228,7 @@ class WebRTCShareEngine {
   }
 
   // ================================================================
-  // HOST: Kesintisiz & Akıcı Kare Gönderme Döngüsü (25 FPS, 0 Lag)
+  // HOST: Kesintisiz & Akıcı Kare Gönderme Döngüsü (30 FPS, Sıfır Gecikme)
   // ================================================================
   _startFrameLoop() {
     if (this.frameTimer) clearInterval(this.frameTimer);
@@ -246,18 +246,18 @@ class WebRTCShareEngine {
       if (!vw || !vh) return;
 
       if (this.isEncoding) {
-        if (Date.now() - this.lastEncodingTime > 120) {
+        if (Date.now() - this.lastEncodingTime > 80) {
           this.isEncoding = false;
         } else {
-          return; // Önceki kare henüz işleniyor, drop et (ağ şişmesini engelle)
+          return; // Önceki kare henüz işleniyor, drop et (ağ kuyruk birikmesini ve gecikmeyi 0'a indir)
         }
       }
 
       this.isEncoding = true;
       this.lastEncodingTime = Date.now();
 
-      // ⚡ Yüksek Performanslı 1280px Genişlik (Net görüntü + 0ms gecikme)
-      const scale = Math.min(1, 1280 / vw);
+      // ⚡ Optimize 1152px Genişlik (Sıfır Gecikme & Keskin Netlik)
+      const scale = Math.min(1, 1152 / vw);
       const tw = Math.round(vw * scale);
       const th = Math.round(vh * scale);
 
@@ -267,15 +267,15 @@ class WebRTCShareEngine {
       }
       this.outCtx.drawImage(videoSource, 0, 0, tw, th);
 
-      // ⚡ Optimize JPEG
+      // ⚡ Hızlı 0.65 JPEG (Ultra düşük gecikmeyle anında socket'e aktarılır)
       this.outCanvas.toBlob((blob) => {
         this.isEncoding = false;
         if (blob && this.isSharing) {
           this.lastEncodedBlob = blob;
           this.socket.emit('screenshare-frame', blob);
         }
-      }, 'image/jpeg', 0.72);
-    }, 40); // 25 FPS
+      }, 'image/jpeg', 0.65);
+    }, 33); // ~30 FPS Gerçek Zamanlı Akış
   }
 
   // ================================================================
@@ -477,11 +477,11 @@ class WebRTCShareEngine {
       };
 
       const now = this.guestAudioCtx.currentTime;
-      // Drift & Zaman Aşımı Koruması (Ses asla gecikmeli birikmez)
+      // Drift & Zaman Aşımı Koruması (Ses asla gecikmeli birikmez, 0 Gecikme)
       if (this.nextPlayTime < now) {
-        this.nextPlayTime = now + 0.01;
-      } else if (this.nextPlayTime - now > 0.12) {
-        this.nextPlayTime = now + 0.02; // Kuyruk birikmesini anında sıfırla
+        this.nextPlayTime = now + 0.005;
+      } else if (this.nextPlayTime - now > 0.06) {
+        this.nextPlayTime = now + 0.01; // Kuyruk gecikmesini anında sıfırla
       }
 
       src.start(this.nextPlayTime);

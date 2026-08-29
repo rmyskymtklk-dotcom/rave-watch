@@ -837,25 +837,26 @@ class SyncEngine {
     this.updateEmbedShield();
   }
 
-  // İzleyicinin Gömülü İframe / HTML5 Videoda İzinsiz İlerlemesini Kökten Engelle
+  // İzleyici İçin İframe Bilgilendirmesi (Sayfada Aşağı Kaydırmaya ve Gezinmeye Engel Olmaz)
   updateEmbedShield() {
     const shield = document.getElementById('embed-viewer-shield');
+    if (this.embedIframe) {
+      this.embedIframe.style.pointerEvents = 'auto'; // İzleyici ve Host her zaman sayfada aşağı inebilir, bölümleri seçebilir
+    }
+
     if (this.currentMediaType === 'embed') {
       if (!this.isHost && this.hostOnlyControl) {
         if (shield) shield.classList.remove('hidden');
-        if (this.embedIframe) this.embedIframe.style.pointerEvents = 'none';
       } else {
         if (shield) shield.classList.add('hidden');
-        if (this.embedIframe) this.embedIframe.style.pointerEvents = 'auto';
       }
     } else {
       if (shield) shield.classList.add('hidden');
-      if (this.embedIframe) this.embedIframe.style.pointerEvents = 'auto';
     }
 
     if (this.html5Video) {
       if (this.currentMediaType === 'html5' && !this.isHost && this.hostOnlyControl) {
-        this.html5Video.style.pointerEvents = 'none';
+        this.html5Video.style.pointerEvents = 'none'; // İzleyici doğrudan videoyu durdurup saramaz, host yönetir
       } else {
         this.html5Video.style.pointerEvents = 'auto';
       }
