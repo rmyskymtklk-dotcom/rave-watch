@@ -65,8 +65,8 @@ function getOrCreateRoom(roomId) {
 /**
  * 1. TAM TERS PROXY (Full Reverse Proxy) — /api/proxy-embed
  * Cloudflare korumalı filmmakinesi.to, dizibox, hdfilm vb. tüm siteler için.
- * Sayfanın tüm alt kaynaklarını (CSS, JS, resim) da proxy üzerinden yükler.
- * Frame-busting, X-Frame-Options ve CSP başlıklarını kaldırır.
+ * - Cloudflare yoksa: sayfayı tam olarak proxy'ler, tüm alt kaynaklar dahil.
+ * - Cloudflare varsa: tarayıcı doğrudan siteyi açar (CF challenge browser'da çözülür).
  */
 app.get('/api/proxy-embed', async (req, res) => {
   const targetUrl = req.query.url;
@@ -96,31 +96,93 @@ app.get('/api/proxy-embed', async (req, res) => {
     'Pragma': 'no-cache',
   };
 
-  // Kullanıcıdan gelen cookie varsa ilet
   if (req.headers.cookie) headers['Cookie'] = req.headers.cookie;
 
-  try {
-    const response = await axios.get(targetUrl, {
-      headers,
-      responseType: 'arraybuffer',
-      timeout: 20000,
-      maxRedirects: 10,
-      validateStatus: () => true,
-    });
-
-    const contentType = (response.headers['content-type'] || 'text/html').toLowerCase();
-
-    // Güvenlik başlıklarını kaldır
+  // Güvenlik başlıklarını kaldır
+  const removeSecHeaders = () => {
     res.removeHeader('X-Frame-Options');
     res.removeHeader('Content-Security-Policy');
     res.removeHeader('X-Content-Type-Options');
     res.removeHeader('Strict-Transport-Security');
     res.setHeader('Access-Control-Allow-Origin', '*');
+  };
+
+  // Cloudflare koruması varsa tarayıcıya direkt yönlendir (challenge browser'da çözülür)
+  const sendDirectBrowserPage = () => {
+    removeSecHeaders();
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8">
+<script>
+  // Frame/top bypass
+  try {
+    Object.defineProperty(window,'top',{get:()=>window.self,configurable:true});
+    Object.defineProperty(window,'parent',{get:()=>window.self,configurable:true});
+    window.open=()=>null;
+  } catch(e){}
+</script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;background:#000;overflow:hidden;}
+  iframe{width:100%;height:100%;border:none;display:block;}
+  .loader{position:fixed;inset:0;background:#091319;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#d9bf87;font-family:sans-serif;gap:16px;transition:opacity 0.5s;}
+  .loader.fade{opacity:0;pointer-events:none;}
+  .spinner{width:44px;height:44px;border:3px solid rgba(217,191,135,0.2);border-top-color:#d9bf87;border-radius:50%;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="loader" id="loader">
+  <div class="spinner"></div>
+  <div style="font-size:15px;font-weight:600;">Film sitesi açılıyor...</div>
+  <div style="font-size:12px;color:#7fa197;">Cloudflare doğrulaması tarayıcıda çözülüyor</div>
+</div>
+<iframe id="directFrame" src="${targetUrl}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation allow-top-navigation-by-user-activation" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+<script>
+  const frame = document.getElementById('directFrame');
+  const loader = document.getElementById('loader');
+  frame.onload = () => { setTimeout(() => loader.classList.add('fade'), 800); };
+  setTimeout(() => loader.classList.add('fade'), 8000);
+</script>
+</body></html>`);
+  };
+
+  try {
+    const response = await axios.get(targetUrl, {
+      headers,
+      responseType: 'arraybuffer',
+      timeout: 15000,
+      maxRedirects: 10,
+      validateStatus: () => true,
+    });
+
+    const contentType = (response.headers['content-type'] || 'text/html').toLowerCase();
+    const status = response.status;
+
+    // Cloudflare bot koruması tespiti (403/503 + cf-ray header veya cf_clearance gerektiriyor)
+    const isCFBlock = (status === 403 || status === 503) && (
+      response.headers['cf-ray'] || response.headers['cf-mitigated'] ||
+      (response.data && response.data.toString().includes('cf-browser-verification')) ||
+      (response.data && response.data.toString().includes('Just a moment'))
+    );
+
+    if (isCFBlock) {
+      console.log('[Proxy] Cloudflare engeli tespit edildi, tarayıcıya direkt yönlendiriliyor:', targetUrl);
+      return sendDirectBrowserPage();
+    }
+
+    removeSecHeaders();
     res.setHeader('Content-Type', contentType.includes('charset') ? contentType : contentType + '; charset=utf-8');
 
     // Sadece HTML sayfalarını dönüştür
     if (contentType.includes('text/html')) {
       let html = response.data.toString('utf8');
+
+      // Cloudflare JS challenge metinleri varsa direkt yönlendir
+      if (html.includes('Just a moment') || html.includes('cf-browser-verification') || html.includes('challenge-platform')) {
+        return sendDirectBrowserPage();
+      }
 
       // Frame-Busting scriptlerini etkisiz kıl
       html = html.replace(/top\.location\s*[=!]/gi, m => m.includes('=') ? '/* fb */ void(0)//' : '/* fb */ true ||');
@@ -139,21 +201,16 @@ app.get('/api/proxy-embed', async (req, res) => {
         return proxyBase + encodeURIComponent(url);
       };
 
-      // href, src, action, srcset linklerini yeniden yaz
       html = html.replace(/\b(href|src|action)=["']([^"'#][^"']*?)["']/gi, (match, attr, url) => {
-        // CSS/JS/Font/Image kaynaklarını proxy'de tut
         return `${attr}="${rewriteUrl(url)}"`;
       });
 
-      // CSS url() içindeki kaynakları yeniden yaz
       html = html.replace(/url\(["']?(https?:\/\/[^"')]+)["']?\)/gi, (match, url) => {
         return `url("${rewriteUrl(url)}")`;
       });
 
-      // Base tag ile kök url'yi sabitle (href yeniden yazımını destekler)
       const inject = `
 <script>
-  // Frame Buster Bypass
   try {
     Object.defineProperty(window, 'top', { get: () => window.self, configurable: true });
     Object.defineProperty(window, 'parent', { get: () => window.self, configurable: true });
@@ -185,32 +242,8 @@ app.get('/api/proxy-embed', async (req, res) => {
 
   } catch (error) {
     console.error('[Proxy] Hata:', error.message);
-    // Cloudflare / Bot Koruması — Kullanıcıya yol göster
-    res.send(`<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8">
-<style>
-  body { background:#091319; color:#f5efe3; font-family:sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
-  .card { background:rgba(14,30,39,0.9); border:1px solid rgba(217,191,135,0.3); border-radius:16px; padding:28px; max-width:500px; text-align:center; }
-  h2 { color:#d9bf87; margin:0 0 12px; }
-  p { color:#a3b8c2; font-size:14px; line-height:1.6; }
-  .steps { background:rgba(217,191,135,0.06); padding:14px; border-radius:10px; text-align:left; font-size:13px; margin:14px 0; }
-  a.btn { display:inline-block; margin-top:14px; padding:11px 22px; background:linear-gradient(135deg,#d9bf87,#c9aa6d); color:#091319; font-weight:700; border-radius:10px; text-decoration:none; }
-</style></head>
-<body><div class="card">
-  <div style="font-size:38px;margin-bottom:10px">🛡️</div>
-  <h2>Cloudflare Korumalı Site</h2>
-  <p>Bu film sitesi bot koruması kullanıyor. Aşağıdaki yöntemle <b>0 sorunla</b> izleyebilirsiniz:</p>
-  <div class="steps">
-    <b>💡 Garantili Çözüm — Sekme Paylaşımı:</b><br><br>
-    1. Aşağıdaki "Yeni Sekmede Aç" butonuna tıklayın<br>
-    2. Filmi o sekmede başlatın<br>
-    3. Odaya dönüp <b>"Ekran Paylaş" → "Sekme"</b>'yi seçin<br>
-    4. <b>"Sekme sesini paylaş"</b> kutusunu işaretleyin<br>
-    ✨ Film ve ses tüm izleyicilere akar!
-  </div>
-  <a href="${targetUrl}" target="_blank" class="btn">🎬 Filmi Yeni Sekmede Aç</a>
-</div></body></html>`);
+    // Ağ hatası veya timeout — tarayıcıya direkt yönlendir
+    sendDirectBrowserPage();
   }
 });
 

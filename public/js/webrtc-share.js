@@ -340,7 +340,7 @@ class WebRTCShareEngine {
   }
 
   // ================================================================
-  // İZLEYİCİ: En Güncel Kareyi Çiz (Garantili & Kesintisiz)
+  // İZLEYİCİ: En Güncel Kareyi Çiz (Garantili & Kesintisiz — Sıfır Boşluk)
   // ================================================================
   _drawFrame() {
     if (!this.latestFrame) return;
@@ -365,50 +365,37 @@ class WebRTCShareEngine {
       this.canvas.style.display = 'block';
     }
 
+    const drawToCanvas = (imgSource) => {
+      if (!this.canvas || !this.ctx) {
+        this.isDrawing = false;
+        return;
+      }
+      // Canvas'ın boyutunu her zaman ekran container boyutuna eşitle (boşluk bırakmaz)
+      const container = this.canvas.parentElement;
+      const cw = container ? container.clientWidth : (window.innerWidth || 1280);
+      const ch = container ? container.clientHeight : (window.innerHeight || 720);
+      if (this.canvas.width !== cw || this.canvas.height !== ch) {
+        this.canvas.width = cw;
+        this.canvas.height = ch;
+      }
+      // Görseli canvas'ı tam dolduracak şekilde gererek çiz (sıfır boşluk)
+      this.ctx.drawImage(imgSource, 0, 0, cw, ch);
+      this.isDrawing = false;
+      if (this.latestFrame) {
+        requestAnimationFrame(() => this._drawFrame());
+      }
+    };
+
     if (window.createImageBitmap) {
       createImageBitmap(blob).then(bmp => {
-        if (!this.canvas || !this.ctx) {
-          bmp.close();
-          this.isDrawing = false;
-          return;
-        }
-        if (this.canvas.width !== bmp.width || this.canvas.height !== bmp.height) {
-          this.canvas.width = bmp.width;
-          this.canvas.height = bmp.height;
-        }
-        this.ctx.drawImage(bmp, 0, 0);
+        drawToCanvas(bmp);
         bmp.close();
-        this.isDrawing = false;
-        if (this.latestFrame) {
-          requestAnimationFrame(() => this._drawFrame());
-        }
-      }).catch(() => {
-        this.isDrawing = false;
-      });
+      }).catch(() => { this.isDrawing = false; });
     } else {
       const img = new Image();
       const url = URL.createObjectURL(blob);
-      img.onload = () => {
-        if (!this.canvas || !this.ctx) {
-          URL.revokeObjectURL(url);
-          this.isDrawing = false;
-          return;
-        }
-        if (this.canvas.width !== img.naturalWidth || this.canvas.height !== img.naturalHeight) {
-          this.canvas.width = img.naturalWidth;
-          this.canvas.height = img.naturalHeight;
-        }
-        this.ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
-        this.isDrawing = false;
-        if (this.latestFrame) {
-          requestAnimationFrame(() => this._drawFrame());
-        }
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        this.isDrawing = false;
-      };
+      img.onload = () => { drawToCanvas(img); URL.revokeObjectURL(url); };
+      img.onerror = () => { URL.revokeObjectURL(url); this.isDrawing = false; };
       img.src = url;
     }
   }
