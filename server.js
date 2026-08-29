@@ -216,9 +216,61 @@ app.get('/api/proxy-embed', async (req, res) => {
     Object.defineProperty(window, 'parent', { get: () => window.self, configurable: true });
     window.open = () => null;
   } catch(e) {}
+
+  // İleri-Geri Sarmayı Engelleyen Akıllı Güvenlik (Oynat/Duraklat Serbest)
+  (function() {
+    let lastValidTime = 0;
+    let isResetting = false;
+
+    document.addEventListener('timeupdate', function(e) {
+      if (e.target && e.target.tagName === 'VIDEO' && !isResetting) {
+        lastValidTime = e.target.currentTime;
+      }
+    }, true);
+
+    document.addEventListener('seeking', function(e) {
+      const vid = e.target;
+      if (vid && vid.tagName === 'VIDEO' && !isResetting) {
+        const diff = Math.abs(vid.currentTime - lastValidTime);
+        if (diff > 1.2) {
+          isResetting = true;
+          vid.currentTime = lastValidTime;
+          setTimeout(() => { isResetting = false; }, 100);
+        }
+      }
+    }, true);
+
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'j' || e.key === 'l' || e.key === 'J' || e.key === 'L') {
+        if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+  })();
 </script>
 <style>
-  html, body { width: 100% !important; min-height: 100% !important; margin: 0 !important; padding: 0 !important; background: #000 !important; overflow-x: hidden !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; }
+  html, body { 
+    width: 100% !important; 
+    min-height: 100% !important; 
+    margin: 0 !important; 
+    padding: 0 !important; 
+    background: #000 !important; 
+    overflow-x: hidden !important; 
+    overflow-y: auto !important; 
+    -webkit-overflow-scrolling: touch !important; 
+  }
+
+  /* Progress/Timeline İlerleme Barlarına Tıklamayı Engelle (Oynat/Duraklat ve Diğer Butonlar Serbesttir) */
+  .jw-slider-time, .vjs-progress-control, .plyr__progress, .timeline-bar,
+  .player-progress, [class*="progress-bar"], [class*="scrubber"], [class*="seek-bar"],
+  [class*="timeline"], [id*="progress-bar"], [id*="scrubber"], [id*="seek-bar"],
+  .jw-display-icon-rewind, .jw-display-icon-forward, [class*="forward-10"], [class*="rewind-10"],
+  [class*="skip-forward"], [class*="skip-back"], [aria-label*="Seek"], [aria-label*="Sar"] {
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+  }
+
   .ad-box, .banner-ad, [class*="reklam"], [id*="reklam"], #popunder, .popunder, [class*="popup"], [id*="popup"],
   .cookie-notice, .gdpr-bar, .notice-bar { display: none !important; }
 </style>`;

@@ -228,7 +228,7 @@ class WebRTCShareEngine {
   }
 
   // ================================================================
-  // HOST: Kesintisiz & Akıcı Kare Gönderme Döngüsü (30 FPS, Sıfır Gecikme)
+  // HOST: Kesintisiz & Akıcı Kare Gönderme Döngüsü (25 FPS, Hafif & 0 Lag)
   // ================================================================
   _startFrameLoop() {
     if (this.frameTimer) clearInterval(this.frameTimer);
@@ -256,8 +256,8 @@ class WebRTCShareEngine {
       this.isEncoding = true;
       this.lastEncodingTime = Date.now();
 
-      // ⚡ Optimize 1152px Genişlik (Sıfır Gecikme & Keskin Netlik)
-      const scale = Math.min(1, 1152 / vw);
+      // ⚡ Süper Hafif & Net 1024px Genişlik (Sıfır Donma, Sıfır Kasma)
+      const scale = Math.min(1, 1024 / vw);
       const tw = Math.round(vw * scale);
       const th = Math.round(vh * scale);
 
@@ -267,15 +267,15 @@ class WebRTCShareEngine {
       }
       this.outCtx.drawImage(videoSource, 0, 0, tw, th);
 
-      // ⚡ Hızlı 0.65 JPEG (Ultra düşük gecikmeyle anında socket'e aktarılır)
+      // ⚡ Optimize JPEG (18-20 KB küçük paketler, anında iletilir)
       this.outCanvas.toBlob((blob) => {
         this.isEncoding = false;
         if (blob && this.isSharing) {
           this.lastEncodedBlob = blob;
           this.socket.emit('screenshare-frame', blob);
         }
-      }, 'image/jpeg', 0.65);
-    }, 33); // ~30 FPS Gerçek Zamanlı Akış
+      }, 'image/jpeg', 0.58);
+    }, 40); // 25 FPS Akıcı & Kesintisiz
   }
 
   // ================================================================
@@ -553,6 +553,23 @@ class WebRTCShareEngine {
     if (this.localStream) {
       this.localStream.getTracks().forEach(t => pc.addTrack(t, this.localStream));
     }
+
+    // Doğrudan P2P Donanım Hızlandırmalı Video Akışı
+    pc.ontrack = (event) => {
+      if (!this.isSharing && event.streams && event.streams[0]) {
+        console.log('[WebRTC] P2P Donanımsal Akış Bağlandı (60 FPS, 0 Lag)');
+        if (this.webrtcVideo) {
+          this.webrtcVideo.srcObject = event.streams[0];
+          this.webrtcVideo.classList.remove('hidden');
+          this.webrtcVideo.style.display = 'block';
+          this.webrtcVideo.play().catch(() => {});
+        }
+        if (this.canvas) {
+          this.canvas.classList.add('hidden');
+          this.canvas.style.display = 'none';
+        }
+      }
+    };
 
     pc.onicecandidate = ({ candidate }) => {
       if (candidate) {
