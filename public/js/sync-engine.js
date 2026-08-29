@@ -711,25 +711,20 @@ class SyncEngine {
       if (media && media.type) {
         if (this.currentMediaType !== media.type || (media.url && this.currentMediaUrl !== media.url)) {
           this.loadMedia(media);
-        } else if (media.type === 'embed') {
-          if (this.embedIframe && media.url) {
-            const finalUrl = media.url.startsWith('/api/proxy-embed') ? media.url : `/api/proxy-embed?url=${encodeURIComponent(media.url)}`;
-            if (this.embedIframe.src !== finalUrl) {
-              this.embedIframe.src = finalUrl;
-            }
-          }
         }
       }
 
-      if (typeof currentTime === 'number') {
-        this.seekTo(currentTime, false);
-      }
-      if (isPlaying) {
-        this.userInitiatedPause = false;
-        this.play(false);
-      } else {
-        this.userInitiatedPause = true;
-        this.pause(false);
+      if (this.currentMediaType === 'youtube' || this.currentMediaType === 'html5') {
+        if (typeof currentTime === 'number') {
+          this.seekTo(currentTime, false);
+        }
+        if (isPlaying) {
+          this.userInitiatedPause = false;
+          this.play(false);
+        } else {
+          this.userInitiatedPause = true;
+          this.pause(false);
+        }
       }
 
       if (media && media.type === 'webrtc' && window.webrtcShare) {

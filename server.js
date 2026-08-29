@@ -222,7 +222,8 @@ app.get('/api/proxy-embed', async (req, res) => {
     window.open = () => null;
   } catch(e) {}
 
-  // İleri-Geri Sarmayı Kökten Engelleyen Güvenlik Motoru (Oynat/Duraklat ve Sayfa Kaydırma Serbest)
+  // Video Oynatma, Durdurma ve Sarmayı Kökten Engelleyen Güvenlik Motoru
+  // Başlatan, Durduran ve İlerleten Sadece Host'tur; İzleyici Yalnızca Sayfayı Kaydırabilir
   (function() {
     let lastValidTime = 0;
     let isInternalSetting = false;
@@ -273,28 +274,11 @@ app.get('/api/proxy-embed', async (req, res) => {
       }
     }, true);
 
-    // İlerleme barlarına mousedown / pointerdown olaylarını yut (Oynat/Duraklat Serbest)
-    document.addEventListener('pointerdown', function(e) {
-      const target = e.target;
-      if (!target) return;
-      const cls = (target.className && typeof target.className === 'string') ? target.className.toLowerCase() : '';
-      const id = (target.id && typeof target.id === 'string') ? target.id.toLowerCase() : '';
-      const aria = (target.getAttribute && target.getAttribute('aria-label')) ? target.getAttribute('aria-label').toLowerCase() : '';
-      
-      const isTimeline = cls.includes('progress') || cls.includes('scrubber') || cls.includes('seek') || cls.includes('timeline') || cls.includes('slider-time') || cls.includes('bar-wrap') || id.includes('progress') || id.includes('scrubber') || id.includes('seek') || id.includes('timeline') || aria.includes('seek') || aria.includes('progress') || aria.includes('sar');
-      
-      const isPlayBtn = cls.includes('play') || cls.includes('pause') || id.includes('play') || id.includes('pause') || aria.includes('play') || aria.includes('oynat');
-
-      if (isTimeline && !isPlayBtn) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-      }
-    }, true);
-
+    // Klavye kısayolları ile oynat/duraklat/sar tuşlarını engelle (Space, Ok Tuşları, K, J, L)
     window.addEventListener('keydown', function(e) {
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'j' || e.key === 'l' || e.key === 'J' || e.key === 'L') {
-        if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+      if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+      const blockedKeys = [' ', 'Space', 'k', 'K', 'j', 'J', 'l', 'L', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+      if (blockedKeys.includes(e.key) || blockedKeys.includes(e.code)) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -313,7 +297,12 @@ app.get('/api/proxy-embed', async (req, res) => {
     -webkit-overflow-scrolling: touch !important; 
   }
 
-  /* Progress/Timeline İlerleme Barlarına Tıklamayı Kökten Engelle (Oynat/Duraklat ve Diğer Butonlar Serbesttir) */
+  /* Video Oynatıcı Alanını (Oynat, Duraklat, İlerlet) Kökten Kilitle - Kontrol Sadece Host'tadır */
+  /* İzleyici Sadece Sayfada Aşağı/Yukarı Kaydırma Yapabilir */
+  video, #player, .jwplayer, .video-js, .plyr, .player-container, 
+  [id*="player"], [class*="player"], .dplayer, .artplayer-app,
+  [class*="video-wrap"], [id*="video-wrap"], [class*="media-player"],
+  .jw-controls, .vjs-control-bar, .plyr__controls, [class*="control-bar"], [class*="controls"],
   .jw-slider-time, .vjs-progress-control, .plyr__progress, .timeline-bar,
   .player-progress, [class*="progress-bar"], [class*="scrubber"], [class*="seek-bar"],
   [class*="timeline"], [id*="progress-bar"], [id*="scrubber"], [id*="seek-bar"],
@@ -324,7 +313,8 @@ app.get('/api/proxy-embed', async (req, res) => {
   .art-control-progress, .dplayer-bar-wrap, .dplayer-bar, .plyr__progress__buffer,
   [class*="range"], input[type="range"][class*="seek"], input[type="range"][class*="progress"] {
     pointer-events: none !important;
-    cursor: not-allowed !important;
+    user-select: none !important;
+    touch-action: pan-y !important;
   }
 
   .ad-box, .banner-ad, [class*="reklam"], [id*="reklam"], #popunder, .popunder, [class*="popup"], [id*="popup"],

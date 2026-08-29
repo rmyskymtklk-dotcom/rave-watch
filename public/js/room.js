@@ -254,7 +254,7 @@ class RoomEngine {
       screen.orientation.addEventListener('change', handleDeviceOrientation);
     }
 
-    // Yeniden Eşitleme Butonu
+    // Yeniden Eşitleme Butonu (Ekranı Karartmadan Temiz Eşitleme)
     const reSyncBtn = document.getElementById('btn-re-sync');
     if (reSyncBtn) {
       reSyncBtn.addEventListener('click', () => {
@@ -262,15 +262,9 @@ class RoomEngine {
           window.showToast('🔄 Host ile anında yeniden eşitleniyor...');
           this.socket.emit('host-action', { action: 'request-sync' });
           this.socket.emit('guest-needs-stream');
-          if (window.webrtcShare) {
+          if (window.webrtcShare && window.syncEngine && window.syncEngine.currentMediaType === 'webrtc') {
             window.webrtcShare._showLayer();
             window.webrtcShare._unlockAudio();
-          }
-          if (window.syncEngine && window.syncEngine.currentMediaType === 'embed' && window.syncEngine.embedIframe) {
-            const curSrc = window.syncEngine.embedIframe.src;
-            if (curSrc && curSrc !== 'about:blank') {
-              window.syncEngine.embedIframe.src = curSrc;
-            }
           }
         } else {
           window.showToast('👑 Siz oda sahibisiniz, yayın kaynağı sizsiniz.');
