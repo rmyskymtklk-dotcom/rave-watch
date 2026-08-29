@@ -427,6 +427,8 @@ class SyncEngine {
       document.getElementById('webrtc-player-container').classList.remove('hidden');
     }
 
+    this.updateEmbedShield();
+
     // Gömülü Iframe (Embed) ve Canlı Yayında (WebRTC) çakışan kontrolleri gizle
     const controlsLeft = document.querySelector('.controls-left');
     if (this.progressContainer) {
@@ -439,7 +441,7 @@ class SyncEngine {
 
     if (controlsLeft) {
       if (this.currentMediaType === 'embed') {
-        // Embed modunda harici sitenin kendi kontrolleri kullanılacağı için sol çubuğu sadeleştir
+        // Embed modunda kontrolleri sadeleştir
         const playBtn = document.getElementById('ctrl-play-pause');
         const timeDisp = document.querySelector('.time-display');
         if (playBtn) playBtn.style.display = 'none';
@@ -812,6 +814,7 @@ class SyncEngine {
   setHost(isHost) {
     this.isHost = isHost;
     this.updateHostLockIndicator();
+    this.updateEmbedShield();
   }
 
   updateHostLockIndicator() {
@@ -829,6 +832,32 @@ class SyncEngine {
         this.hostLockTag.innerHTML = `<i class="fa-solid fa-unlock"></i> <span>Ortak Kontrol</span>`;
         this.hostLockTag.style.borderColor = '#00f2fe';
         this.hostLockTag.style.color = '#00f2fe';
+      }
+    }
+    this.updateEmbedShield();
+  }
+
+  // İzleyicinin Gömülü İframe / HTML5 Videoda İzinsiz İlerlemesini Kökten Engelle
+  updateEmbedShield() {
+    const shield = document.getElementById('embed-viewer-shield');
+    if (this.currentMediaType === 'embed') {
+      if (!this.isHost && this.hostOnlyControl) {
+        if (shield) shield.classList.remove('hidden');
+        if (this.embedIframe) this.embedIframe.style.pointerEvents = 'none';
+      } else {
+        if (shield) shield.classList.add('hidden');
+        if (this.embedIframe) this.embedIframe.style.pointerEvents = 'auto';
+      }
+    } else {
+      if (shield) shield.classList.add('hidden');
+      if (this.embedIframe) this.embedIframe.style.pointerEvents = 'auto';
+    }
+
+    if (this.html5Video) {
+      if (this.currentMediaType === 'html5' && !this.isHost && this.hostOnlyControl) {
+        this.html5Video.style.pointerEvents = 'none';
+      } else {
+        this.html5Video.style.pointerEvents = 'auto';
       }
     }
   }

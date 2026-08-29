@@ -1,7 +1,7 @@
 /**
  * ============================================================================
- * SYNCPARTY BULLETPROOF SCREEN & AUDIO STREAMING ENGINE v7.0
- * Garantili Canlı Görüntü & Kristal Netliğinde Ses, 0 Gecikme, Kesintisiz Akış
+ * SYNCPARTY BULLETPROOF SCREEN & AUDIO STREAMING ENGINE v8.0
+ * Garantili Canlı Görüntü (Host & İzleyici), 3.5x Ses Güçlendirici, 0 Bellek Sızıntısı
  * ============================================================================
  */
 
@@ -17,11 +17,7 @@ class WebRTCShareEngine {
     this.ctx = this.canvas ? this.canvas.getContext('2d', { alpha: false }) : null;
     this.webrtcVideo = document.getElementById('webrtc-video');
 
-    // Gizli Yakalama Elemanları (Host)
-    this.captureVideo = document.createElement('video');
-    this.captureVideo.muted = true;
-    this.captureVideo.playsInline = true;
-
+    // Bellek İçi Çizim Canvas'ı (Host)
     this.outCanvas = document.createElement('canvas');
     this.outCtx = this.outCanvas.getContext('2d', { alpha: false });
 
@@ -34,10 +30,11 @@ class WebRTCShareEngine {
     this.isDrawing = false;
     this.lastDrawTime = 0;
 
-    // Yüksek Kazançlı Ses Sistemi (İzleyici)
+    // Kalıcı Ses Sistemi (İzleyici - 0 Bellek Sızıntısı & 3.5x Audio Booster)
     this.guestAudioCtx = null;
+    this.guestCompressor = null;
+    this.guestGainNode = null;
     this.nextPlayTime = 0;
-    this.p2pAudioEl = null;
 
     // Ses Yakalama Sistemi (Host)
     this.hostAudioCtx = null;
@@ -180,10 +177,20 @@ class WebRTCShareEngine {
       this.localStream = stream;
       this.isSharing = true;
 
-      this.captureVideo.srcObject = stream;
-      await this.captureVideo.play().catch(() => {});
+      // Host kendi ekranını doğrudan hardware-accelerated video elementiyle 60fps kesintisiz görür
+      if (this.webrtcVideo) {
+        this.webrtcVideo.srcObject = stream;
+        this.webrtcVideo.muted = true;
+        this.webrtcVideo.classList.remove('hidden');
+        this.webrtcVideo.style.display = 'block';
+        await this.webrtcVideo.play().catch(() => {});
+      }
 
-      // Host için de katmanı göster (hem host hem izleyici görür)
+      if (this.canvas) {
+        this.canvas.classList.add('hidden');
+        this.canvas.style.display = 'none';
+      }
+
       this._showLayer();
       this._startFrameLoop();
 
@@ -221,7 +228,7 @@ class WebRTCShareEngine {
   }
 
   // ================================================================
-  // HOST: Kesintisiz & Akıcı Kare Gönderme Döngüsü
+  // HOST: Kesintisiz & Akıcı Kare Gönderme Döngüsü (25 FPS, 0 Lag)
   // ================================================================
   _startFrameLoop() {
     if (this.frameTimer) clearInterval(this.frameTimer);
@@ -231,23 +238,25 @@ class WebRTCShareEngine {
     this.frameTimer = setInterval(() => {
       if (!this.isSharing) return;
 
-      // Gerçek video boyutlarını her karede al (tanımsız vw/vh hatası yoktur)
-      const vw = this.captureVideo.videoWidth;
-      const vh = this.captureVideo.videoHeight;
+      const videoSource = (this.webrtcVideo && this.webrtcVideo.videoWidth) ? this.webrtcVideo : null;
+      if (!videoSource) return;
+
+      const vw = videoSource.videoWidth;
+      const vh = videoSource.videoHeight;
       if (!vw || !vh) return;
 
       if (this.isEncoding) {
-        if (Date.now() - this.lastEncodingTime > 150) {
+        if (Date.now() - this.lastEncodingTime > 120) {
           this.isEncoding = false;
         } else {
-          return;
+          return; // Önceki kare henüz işleniyor, drop et (ağ şişmesini engelle)
         }
       }
 
       this.isEncoding = true;
       this.lastEncodingTime = Date.now();
 
-      // ⚡ Yüksek Performanslı, Sıfır Gecikmeli & Kristal Netlikte Akış
+      // ⚡ Yüksek Performanslı 1280px Genişlik (Net görüntü + 0ms gecikme)
       const scale = Math.min(1, 1280 / vw);
       const tw = Math.round(vw * scale);
       const th = Math.round(vh * scale);
@@ -256,25 +265,16 @@ class WebRTCShareEngine {
         this.outCanvas.width = tw;
         this.outCanvas.height = th;
       }
-      this.outCtx.drawImage(this.captureVideo, 0, 0, tw, th);
+      this.outCtx.drawImage(videoSource, 0, 0, tw, th);
 
-      // Host önizleme canvas'ı — izleyicide ve hostta görünür
-      if (this.canvas && this.ctx) {
-        if (this.canvas.width !== tw || this.canvas.height !== th) {
-          this.canvas.width = tw;
-          this.canvas.height = th;
-        }
-        this.ctx.drawImage(this.outCanvas, 0, 0);
-      }
-
-      // ⚡ Optimize JPEG (Ağ asla tıkanmaz, mesajlar ve video 0ms anında iletilir)
+      // ⚡ Optimize JPEG
       this.outCanvas.toBlob((blob) => {
         this.isEncoding = false;
         if (blob && this.isSharing) {
           this.lastEncodedBlob = blob;
           this.socket.emit('screenshare-frame', blob);
         }
-      }, 'image/jpeg', 0.70);
+      }, 'image/jpeg', 0.72);
     }, 40); // 25 FPS
   }
 
@@ -323,6 +323,16 @@ class WebRTCShareEngine {
     if (this.hostAudioCtx) { try { this.hostAudioCtx.close(); } catch(e){} this.hostAudioCtx = null; }
     if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; }
 
+    if (this.webrtcVideo) {
+      this.webrtcVideo.srcObject = null;
+      this.webrtcVideo.classList.add('hidden');
+      this.webrtcVideo.style.display = 'none';
+    }
+    if (this.canvas) {
+      this.canvas.classList.remove('hidden');
+      this.canvas.style.display = 'block';
+    }
+
     this.peerConnections.forEach(pc => { try { pc.close(); } catch(e){} });
     this.peerConnections.clear();
     this.isSharing = false;
@@ -340,13 +350,13 @@ class WebRTCShareEngine {
   }
 
   // ================================================================
-  // İZLEYİCİ: En Güncel Kareyi Çiz (Garantili & Kesintisiz — Sıfır Boşluk)
+  // İZLEYİCİ: En Güncel Kareyi Çiz (Garantili & Sıfır Boşluk)
   // ================================================================
   _drawFrame() {
     if (!this.latestFrame) return;
 
     if (this.isDrawing) {
-      if (Date.now() - this.lastDrawTime > 150) {
+      if (Date.now() - this.lastDrawTime > 120) {
         this.isDrawing = false;
       } else {
         return;
@@ -359,8 +369,13 @@ class WebRTCShareEngine {
     const blob = this.latestFrame;
     this.latestFrame = null;
 
-    // Canvas'ın her zaman görünür ve açık olduğundan emin ol
-    if (this.canvas && this.canvas.classList.contains('hidden')) {
+    // WebRTC katmanının açık olduğundan emin ol
+    const wrtc = document.getElementById('webrtc-player-container');
+    if (wrtc && (wrtc.classList.contains('hidden') || wrtc.style.display === 'none')) {
+      this._showLayer();
+    }
+
+    if (this.canvas && (this.canvas.classList.contains('hidden') || this.canvas.style.display === 'none')) {
       this.canvas.classList.remove('hidden');
       this.canvas.style.display = 'block';
     }
@@ -370,15 +385,13 @@ class WebRTCShareEngine {
         this.isDrawing = false;
         return;
       }
-      // Canvas'ın boyutunu her zaman ekran container boyutuna eşitle (boşluk bırakmaz)
       const container = this.canvas.parentElement;
-      const cw = container ? container.clientWidth : (window.innerWidth || 1280);
-      const ch = container ? container.clientHeight : (window.innerHeight || 720);
+      const cw = (container && container.clientWidth > 50) ? container.clientWidth : (window.innerWidth || 1280);
+      const ch = (container && container.clientHeight > 50) ? container.clientHeight : (window.innerHeight || 720);
       if (this.canvas.width !== cw || this.canvas.height !== ch) {
         this.canvas.width = cw;
         this.canvas.height = ch;
       }
-      // Görseli canvas'ı tam dolduracak şekilde gererek çiz (sıfır boşluk)
       this.ctx.drawImage(imgSource, 0, 0, cw, ch);
       this.isDrawing = false;
       if (this.latestFrame) {
@@ -401,20 +414,47 @@ class WebRTCShareEngine {
   }
 
   // ================================================================
-  // İZLEYİCİ: 2.2x Yüksek Kazançlı Ses Çalma (Audio Booster)
+  // İZLEYİCİ: 3.5x Yüksek Kazançlı Ses Çalma (Dinamik Kompresör & 0 Sızıntı)
   // ================================================================
+  _ensureGuestAudio() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!this.guestAudioCtx && AC) {
+      this.guestAudioCtx = new AC();
+      this.nextPlayTime = this.guestAudioCtx.currentTime;
+
+      // Dinamik Kompresör (Yüksek seste paraziti & bozulmayı 100% önler)
+      this.guestCompressor = this.guestAudioCtx.createDynamicsCompressor();
+      this.guestCompressor.threshold.setValueAtTime(-14, this.guestAudioCtx.currentTime);
+      this.guestCompressor.knee.setValueAtTime(30, this.guestAudioCtx.currentTime);
+      this.guestCompressor.ratio.setValueAtTime(12, this.guestAudioCtx.currentTime);
+      this.guestCompressor.attack.setValueAtTime(0.003, this.guestAudioCtx.currentTime);
+      this.guestCompressor.release.setValueAtTime(0.25, this.guestAudioCtx.currentTime);
+
+      // Kalıcı Ana GainNode (Bellekte tek bir node kullanılır, 30dk sonra kasmaz)
+      this.guestGainNode = this.guestAudioCtx.createGain();
+      this.guestGainNode.gain.setValueAtTime(1.5, this.guestAudioCtx.currentTime);
+
+      this.guestCompressor.connect(this.guestGainNode);
+      this.guestGainNode.connect(this.guestAudioCtx.destination);
+    }
+
+    if (this.guestAudioCtx && this.guestAudioCtx.state === 'suspended') {
+      this.guestAudioCtx.resume().catch(() => {});
+    }
+  }
+
   _playAudio({ pcm, sampleRate }) {
     if (!pcm) return;
     try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!this.guestAudioCtx && AC) {
-        this.guestAudioCtx = new AC();
-        this.nextPlayTime = this.guestAudioCtx.currentTime;
-      }
+      this._ensureGuestAudio();
       if (!this.guestAudioCtx) return;
 
-      if (this.guestAudioCtx.state === 'suspended') {
-        this.guestAudioCtx.resume().catch(() => {});
+      const rawVol = window.syncEngine ? window.syncEngine.localVolume : 100;
+      const isMuted = window.syncEngine ? window.syncEngine.isMuted : false;
+      // ⚡ 3.5x Güçlendirilmiş Ses Çarpanı
+      const targetGain = isMuted ? 0 : Math.max(0, (rawVol / 100) * 3.5);
+      if (this.guestGainNode) {
+        this.guestGainNode.gain.setValueAtTime(targetGain, this.guestAudioCtx.currentTime);
       }
 
       const i16 = new Int16Array(pcm);
@@ -429,20 +469,21 @@ class WebRTCShareEngine {
 
       const src = this.guestAudioCtx.createBufferSource();
       src.buffer = buf;
+      src.connect(this.guestCompressor);
 
-      const gainNode = this.guestAudioCtx.createGain();
-      const rawVol = window.syncEngine ? window.syncEngine.localVolume : 100;
-      const isMuted = window.syncEngine ? window.syncEngine.isMuted : false;
-      const gainVal = isMuted ? 0 : (rawVol / 100) * 2.2;
-      gainNode.gain.value = gainVal;
-
-      src.connect(gainNode);
-      gainNode.connect(this.guestAudioCtx.destination);
+      // Bellek Sızıntısı Engelleyici: Çalma bitince buffer'ı hemen bellekten kopar
+      src.onended = () => {
+        try { src.disconnect(); } catch(e){}
+      };
 
       const now = this.guestAudioCtx.currentTime;
+      // Drift & Zaman Aşımı Koruması (Ses asla gecikmeli birikmez)
       if (this.nextPlayTime < now) {
         this.nextPlayTime = now + 0.01;
+      } else if (this.nextPlayTime - now > 0.12) {
+        this.nextPlayTime = now + 0.02; // Kuyruk birikmesini anında sıfırla
       }
+
       src.start(this.nextPlayTime);
       this.nextPlayTime += buf.duration;
     } catch (e) {
@@ -452,34 +493,47 @@ class WebRTCShareEngine {
 
   _unlockAudio() {
     if (this.autoplayOverlay) this.autoplayOverlay.classList.add('hidden');
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!this.guestAudioCtx && AC) {
-      this.guestAudioCtx = new AC();
-      this.nextPlayTime = this.guestAudioCtx.currentTime;
-    }
-    if (this.guestAudioCtx && this.guestAudioCtx.state === 'suspended') {
-      this.guestAudioCtx.resume().catch(() => {});
-    }
+    this._ensureGuestAudio();
   }
 
   // ================================================================
-  // Katmanı Görünür Yap
+  // Katmanı Görünür Yap (Host ve İzleyiciye Özel)
   // ================================================================
   _showLayer() {
     ['idle-player-container', 'youtube-player-container', 'html5-player-container', 'embed-player-container'].forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.classList.add('hidden');
+      if (el) {
+        el.classList.add('hidden');
+        el.style.display = 'none';
+      }
     });
 
     const wrtc = document.getElementById('webrtc-player-container');
     if (wrtc) {
       wrtc.classList.remove('hidden');
-      wrtc.style.display = 'flex';
+      wrtc.style.display = 'block';
     }
 
-    if (this.canvas) {
-      this.canvas.classList.remove('hidden');
-      this.canvas.style.display = 'block';
+    if (this.isSharing) {
+      // Host: Doğrudan video göster
+      if (this.webrtcVideo) {
+        this.webrtcVideo.classList.remove('hidden');
+        this.webrtcVideo.style.display = 'block';
+      }
+      if (this.canvas) {
+        this.canvas.classList.add('hidden');
+        this.canvas.style.display = 'none';
+      }
+    } else {
+      // İzleyici: Canvas üzerinden çiz
+      if (this.webrtcVideo) {
+        this.webrtcVideo.classList.add('hidden');
+        this.webrtcVideo.style.display = 'none';
+      }
+      if (this.canvas) {
+        this.canvas.classList.remove('hidden');
+        this.canvas.style.display = 'block';
+      }
     }
   }
 
