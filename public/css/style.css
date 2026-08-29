@@ -170,17 +170,15 @@ html, body {
    ------------------------------------------------------------- */
 .cosmic-animated-bg {
   position: fixed;
-  top: -5%;
-  left: -5%;
-  width: 110%;
-  height: 110%;
-  background: 
-    radial-gradient(circle at center, rgba(9, 19, 25, 0.45) 0%, rgba(9, 19, 25, 0.88) 85%),
-    url('/assets/cosmic-theme.jpg') center center / cover no-repeat;
-  z-index: -1;
+  top: -4%;
+  left: -4%;
+  width: 108%;
+  height: 108%;
+  background: url('/assets/cosmic-theme.jpg') center center / cover no-repeat;
+  z-index: 0;
   pointer-events: none;
-  animation: cosmicFloat 22s ease-in-out infinite alternate;
-  filter: brightness(0.92) contrast(1.05);
+  animation: cosmicFloat 20s ease-in-out infinite alternate;
+  filter: brightness(0.88) contrast(1.08);
 }
 
 @keyframes cosmicFloat {
@@ -188,10 +186,10 @@ html, body {
     transform: scale(1.0) translate(0, 0);
   }
   50% {
-    transform: scale(1.06) translate(-1.2%, -0.8%);
+    transform: scale(1.05) translate(-1.5%, -1%);
   }
   100% {
-    transform: scale(1.02) translate(0.8%, 1.2%);
+    transform: scale(1.02) translate(1%, 1.2%);
   }
 }
 
@@ -203,6 +201,7 @@ html, body {
   display: flex;
   flex-direction: column;
   position: relative;
+  background-color: transparent !important;
   overflow-x: hidden;
 }
 
@@ -226,17 +225,58 @@ html, body {
 }
 
 .brand-icon {
-  width: 44px;
-  height: 44px;
-  background: linear-gradient(135deg, #d9bf87 0%, #d68d71 100%);
-  border-radius: var(--radius-md);
+  width: 46px;
+  height: 46px;
+  background: radial-gradient(circle at 35% 35%, #e88d67 0%, #c85a32 55%, #8f3416 100%);
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.35rem;
-  color: #091319;
-  box-shadow: var(--shadow-glow);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  font-size: 1.4rem;
+  color: #fff;
+  box-shadow: 0 0 20px rgba(232, 141, 103, 0.6), inset -4px -4px 8px rgba(0, 0, 0, 0.45);
+  border: 2px solid rgba(255, 200, 160, 0.5);
+  position: relative;
+  overflow: visible;
+}
+
+/* Mars Kraterleri */
+.brand-icon::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  width: 8px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(100, 30, 10, 0.4);
+  box-shadow: 18px 16px 0 2px rgba(100, 30, 10, 0.35), 8px 22px 0 0 rgba(100, 30, 10, 0.3);
+}
+
+.brand-icon i {
+  position: relative;
+  z-index: 2;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+}
+
+.brand-icon-mini {
+  width: 34px;
+  height: 34px;
+  background: radial-gradient(circle at 35% 35%, #e88d67 0%, #c85a32 55%, #8f3416 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  color: #fff;
+  box-shadow: 0 0 14px rgba(232, 141, 103, 0.5);
+  border: 1.5px solid rgba(255, 200, 160, 0.4);
+  position: relative;
+}
+
+.brand-icon-mini i {
+  position: relative;
+  z-index: 2;
 }
 
 .brand-text {
