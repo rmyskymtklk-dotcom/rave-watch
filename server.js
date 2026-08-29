@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 const cors = require('cors');
 const axios = require('axios');
+const compression = require('compression');
 
 const app = express();
 const server = http.createServer(app);
@@ -20,9 +21,13 @@ const io = new Server(server, {
   maxHttpBufferSize: 1e8 // 100 MB buffer
 });
 
+app.use(compression());
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1h',
+  etag: true
+}));
 
 // Oda Verileri (Hafıza Yönetimi)
 const rooms = new Map();
@@ -584,16 +589,17 @@ io.on('connection', (socket) => {
         liveTime += elapsed;
       }
 
-      // 1. Sunucu hesapladığı tahmini süreyi anında izleyiciye iletir (Gecikmesiz)
+      // 1. Sunucu hesapladığı tahmini süreyi ve o anki medyayı anında izleyiciye iletir
       socket.emit('sync-force', {
         currentTime: liveTime,
         isPlaying: room.media.isPlaying,
         media: room.media
       });
 
-      // 2. Host'tan tam milisaniyelik anlık süreyi çekip izleyiciye basar
+      // 2. Host'tan anlık süreyi ve ekran akışını talep et
       if (room.hostId && room.hostId !== socket.id) {
         io.to(room.hostId).emit('host-ping-time-for-guest', { guestId: socket.id });
+        io.to(room.hostId).emit('guest-needs-stream', { guestId: socket.id });
       }
     }
   });

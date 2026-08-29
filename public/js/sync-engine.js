@@ -707,7 +707,20 @@ class SyncEngine {
       }
     });
 
-    this.socket.on('sync-force', ({ currentTime, isPlaying }) => {
+    this.socket.on('sync-force', ({ currentTime, isPlaying, media }) => {
+      if (media && media.type) {
+        if (this.currentMediaType !== media.type || (media.url && this.currentMediaUrl !== media.url)) {
+          this.loadMedia(media);
+        } else if (media.type === 'embed') {
+          if (this.embedIframe && media.url) {
+            const finalUrl = media.url.startsWith('/api/proxy-embed') ? media.url : `/api/proxy-embed?url=${encodeURIComponent(media.url)}`;
+            if (this.embedIframe.src !== finalUrl) {
+              this.embedIframe.src = finalUrl;
+            }
+          }
+        }
+      }
+
       if (typeof currentTime === 'number') {
         this.seekTo(currentTime, false);
       }
@@ -718,6 +731,12 @@ class SyncEngine {
         this.userInitiatedPause = true;
         this.pause(false);
       }
+
+      if (media && media.type === 'webrtc' && window.webrtcShare) {
+        window.webrtcShare._showLayer();
+        window.webrtcShare._unlockAudio();
+      }
+
       window.showToast('⚡ Host ile anında eşitlendi!');
     });
 

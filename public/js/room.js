@@ -255,14 +255,28 @@ class RoomEngine {
     }
 
     // Yeniden Eşitleme Butonu
-    document.getElementById('btn-re-sync').addEventListener('click', () => {
-      if (!this.isHost) {
-        window.showToast('🔄 Host ile anında yeniden eşitleniyor...');
-        this.socket.emit('host-action', { action: 'request-sync' });
-      } else {
-        window.showToast('👑 Siz oda sahibisiniz, yayın kaynağı sizsiniz.');
-      }
-    });
+    const reSyncBtn = document.getElementById('btn-re-sync');
+    if (reSyncBtn) {
+      reSyncBtn.addEventListener('click', () => {
+        if (!this.isHost) {
+          window.showToast('🔄 Host ile anında yeniden eşitleniyor...');
+          this.socket.emit('host-action', { action: 'request-sync' });
+          this.socket.emit('guest-needs-stream');
+          if (window.webrtcShare) {
+            window.webrtcShare._showLayer();
+            window.webrtcShare._unlockAudio();
+          }
+          if (window.syncEngine && window.syncEngine.currentMediaType === 'embed' && window.syncEngine.embedIframe) {
+            const curSrc = window.syncEngine.embedIframe.src;
+            if (curSrc && curSrc !== 'about:blank') {
+              window.syncEngine.embedIframe.src = curSrc;
+            }
+          }
+        } else {
+          window.showToast('👑 Siz oda sahibisiniz, yayın kaynağı sizsiniz.');
+        }
+      });
+    }
 
     // Yan Panel Sekme Değişimi
     const tabChatBtn = document.getElementById('tab-chat-btn');
@@ -476,13 +490,13 @@ class RoomEngine {
       // Medyayı yükle
       if (data.media) {
         window.syncEngine.loadMedia(data.media);
-        // Eğer odada aktif ekran paylaşımı varsa hemen akışı talep et
+        // Eğer odada aktif ekran paylaşımı varsa derhal (0ms) akışı talep et
         if (data.media.type === 'webrtc') {
+          if (window.webrtcShare) window.webrtcShare._showLayer();
+          this.socket.emit('guest-needs-stream');
           setTimeout(() => {
             this.socket.emit('guest-needs-stream');
-            // Canvas katmanını da göster
-            if (window.webrtcShare) window.webrtcShare._showLayer();
-          }, 500);
+          }, 300);
         }
       }
 

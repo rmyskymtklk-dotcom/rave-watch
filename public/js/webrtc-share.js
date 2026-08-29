@@ -125,10 +125,13 @@ class WebRTCShareEngine {
       }
     });
 
-    // ─── İzleyici Akış İstediğinde (Anında İlk Kareyi Gönder) ───
-    this.socket.on('guest-needs-stream', ({ guestId }) => {
+    // ─── İzleyici Akış İstediğinde (Anında İlk Kareyi Gönder ve P2P Başlat) ───
+    this.socket.on('guest-needs-stream', (data = {}) => {
       if (this.isSharing && this.localStream) {
-        this._createPeer(guestId, true);
+        const guestId = (data && data.guestId) ? data.guestId : null;
+        if (guestId) {
+          this._createPeer(guestId, true);
+        }
         if (this.lastEncodedBlob) {
           this.socket.emit('screenshare-frame', this.lastEncodedBlob);
         }
@@ -385,14 +388,12 @@ class WebRTCShareEngine {
         this.isDrawing = false;
         return;
       }
-      const container = this.canvas.parentElement;
-      const cw = (container && container.clientWidth > 50) ? container.clientWidth : (window.innerWidth || 1280);
-      const ch = (container && container.clientHeight > 50) ? container.clientHeight : (window.innerHeight || 720);
-      if (this.canvas.width !== cw || this.canvas.height !== ch) {
-        this.canvas.width = cw;
-        this.canvas.height = ch;
+      // Sabit 1280x720 GPU buffer (Sıfır bellek tahsisi, sıfır kasma, 60 FPS pürüzsüz)
+      if (this.canvas.width !== 1280 || this.canvas.height !== 720) {
+        this.canvas.width = 1280;
+        this.canvas.height = 720;
       }
-      this.ctx.drawImage(imgSource, 0, 0, cw, ch);
+      this.ctx.drawImage(imgSource, 0, 0, 1280, 720);
       this.isDrawing = false;
       if (this.latestFrame) {
         requestAnimationFrame(() => this._drawFrame());
