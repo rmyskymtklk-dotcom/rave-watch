@@ -166,16 +166,44 @@ html, body {
 }
 
 /* -------------------------------------------------------------
+   HAREKETLİ KOZMİK FOTOĞRAF ARKA PLANI (ANIMATED LAIKA BG)
+   ------------------------------------------------------------- */
+.cosmic-animated-bg {
+  position: fixed;
+  top: -5%;
+  left: -5%;
+  width: 110%;
+  height: 110%;
+  background: 
+    radial-gradient(circle at center, rgba(9, 19, 25, 0.45) 0%, rgba(9, 19, 25, 0.88) 85%),
+    url('/assets/cosmic-theme.jpg') center center / cover no-repeat;
+  z-index: -1;
+  pointer-events: none;
+  animation: cosmicFloat 22s ease-in-out infinite alternate;
+  filter: brightness(0.92) contrast(1.05);
+}
+
+@keyframes cosmicFloat {
+  0% {
+    transform: scale(1.0) translate(0, 0);
+  }
+  50% {
+    transform: scale(1.06) translate(-1.2%, -0.8%);
+  }
+  100% {
+    transform: scale(1.02) translate(0.8%, 1.2%);
+  }
+}
+
+/* -------------------------------------------------------------
    LOBBY (ANA SAYFA) DÜZENİ
    ------------------------------------------------------------- */
 .lobby-body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: 
-    radial-gradient(circle at 85% 15%, rgba(214, 141, 113, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 15% 35%, rgba(217, 191, 135, 0.08) 0%, transparent 35%),
-    linear-gradient(180deg, #091319 0%, #0d1e28 100%);
+  position: relative;
+  overflow-x: hidden;
 }
 
 .lobby-header {
@@ -897,14 +925,14 @@ html, body {
   display: block;
 }
 
-/* WebRTC canvas ve donanımsal video - %100 Ekrana Yayılma & Sıfır Boşluk */
+/* WebRTC canvas ve donanımsal video - Sıfır Boşluklu %100 Tam Ekran */
 #webrtc-canvas,
 .live-screen-canvas {
   width: 100% !important;
   height: 100% !important;
   max-width: 100% !important;
   max-height: 100% !important;
-  object-fit: fill !important;
+  object-fit: cover !important;
   object-position: center center !important;
   background: #000;
   display: block;
@@ -915,7 +943,7 @@ html, body {
   height: 100% !important;
   max-width: 100% !important;
   max-height: 100% !important;
-  object-fit: fill !important;
+  object-fit: cover !important;
   object-position: center center !important;
   background: #000;
   display: block;
@@ -934,7 +962,7 @@ html, body {
 .fill-screen-mode #webrtc-canvas,
 .fill-screen-mode .live-screen-canvas,
 .fill-screen-mode #html5-video {
-  object-fit: fill !important;
+  object-fit: cover !important;
 }
 
 /* Proxy Embed IFrame */

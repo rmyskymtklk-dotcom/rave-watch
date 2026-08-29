@@ -63,8 +63,8 @@ function getOrCreateRoom(roomId) {
 // -------------------------------------------------------------
 
 /**
- * 1. Gelişmiş Iframe Embed Proxy'si (/api/proxy-embed)
- * X-Frame-Options, CSP, Frame-Busting scriptlerini temizler ve video oynatıcısını %100 ekrana yayar.
+ * 1. Evrensel Iframe Embed Proxy'si (/api/proxy-embed)
+ * X-Frame-Options, CSP, Frame-Busting scriptlerini ve Cloudflare/WAF başlıklarını temizler.
  */
 app.get('/api/proxy-embed', async (req, res) => {
   const targetUrl = req.query.url;
@@ -78,12 +78,12 @@ app.get('/api/proxy-embed', async (req, res) => {
 
     const response = await axios.get(targetUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
         'Referer': origin,
         'Origin': origin,
-        'sec-ch-ua': '"Not)A;Brand";v="99", "Google Chrome";v="127", "Chromium";v="127"',
+        'sec-ch-ua': '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
         'sec-ch-ua-mobile': '?0',
         'sec-ch-ua-platform': '"Windows"',
         'sec-fetch-dest': 'iframe',
@@ -92,13 +92,13 @@ app.get('/api/proxy-embed', async (req, res) => {
         'Upgrade-Insecure-Requests': '1'
       },
       responseType: 'text',
-      timeout: 20000,
-      maxRedirects: 7
+      timeout: 25000,
+      maxRedirects: 8
     });
 
     let html = response.data;
 
-    // Frame-Busting Koruması
+    // Frame-Busting Korumasını Kökten Temizle
     html = html.replace(/top\.location\s*=/gi, '/* anti-frame */ window.location =');
     html = html.replace(/window\.top\s*!==\s*window\.self/gi, 'false');
     html = html.replace(/top\s*!==\s*self/gi, 'false');
@@ -123,8 +123,8 @@ app.get('/api/proxy-embed', async (req, res) => {
     </script>
     <style>
       html, body { width: 100% !important; height: 100% !important; margin: 0 !important; padding: 0 !important; background: #000 !important; overflow: hidden !important; }
-      iframe, video, #player, .jwplayer, .video-js, .plyr { width: 100% !important; height: 100% !important; max-width: 100vw !important; max-height: 100vh !important; }
-      iframe[src*="ad"], .ad-box, .banner-ad, [class*="reklam"], [id*="reklam"], #popunder, .popunder { display: none !important; opacity: 0 !important; }
+      iframe, video, #player, .jwplayer, .video-js, .plyr, .player-container { width: 100% !important; height: 100% !important; max-width: 100vw !important; max-height: 100vh !important; }
+      iframe[src*="ad"], .ad-box, .banner-ad, [class*="reklam"], [id*="reklam"], #popunder, .popunder, [class*="popup"] { display: none !important; opacity: 0 !important; pointer-events: none !important; }
     </style>`;
 
     if (html.includes('<head>')) {
@@ -136,18 +136,36 @@ app.get('/api/proxy-embed', async (req, res) => {
     res.send(html);
   } catch (error) {
     console.error('Proxy Hatası:', error.message);
-    res.status(500).send(`
-      <div style="background:#0a0a0f;color:#ef4444;padding:28px;font-family:sans-serif;text-align:center;border-radius:12px;margin:20px;border:1px solid rgba(239,68,68,0.3);">
-        <div style="font-size:36px;margin-bottom:12px;">🛡️</div>
-        <h3 style="margin-bottom:8px;color:#fff;font-size:18px;">Film Sitesi Proxy Koruması</h3>
-        <p style="color:#aaa;font-size:14px;max-width:500px;margin:0 auto 16px auto;">
-          Bu film sitesi doğrudan proxy ile açılamadı.
-        </p>
-        <div style="background:rgba(255,255,255,0.06);padding:14px;border-radius:8px;max-width:480px;margin:0 auto;text-align:left;font-size:13px;color:#e2e8f0;">
-          <b style="color:#f59e0b;">💡 Kesintisiz Çözüm:</b><br>
-          Filmi yeni bir tarayıcı sekmesinde açıp yukarıdaki <b>"Ekran Paylaş"</b> butonuyla <b>Sekme</b> olarak 60 FPS sesli yayınlayabilirsiniz!
+    // Cloudflare / Bot Koruması Olduğunda Kullanıcı Dostu Doğrudan Çözüm
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { background: #091319; color: #f5efe3; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+          .proxy-card { background: rgba(14, 30, 39, 0.9); border: 1px solid rgba(217, 191, 135, 0.3); border-radius: 16px; padding: 32px; max-width: 520px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
+          .btn-action { display: inline-block; margin-top: 18px; padding: 12px 24px; background: linear-gradient(135deg, #d9bf87, #c9aa6d); color: #091319; font-weight: 700; border-radius: 10px; text-decoration: none; }
+        </style>
+      </head>
+      <body>
+        <div class="proxy-card">
+          <div style="font-size: 40px; margin-bottom: 12px;">🛡️</div>
+          <h2 style="margin: 0 0 10px 0; color: #d9bf87;">Bu Film Sitesi Cloudflare Korumalı</h2>
+          <p style="color: #a3b8c2; font-size: 14px; line-height: 1.6;">
+            Bu film sitesi sunucu bazlı çekimleri engelliyor. Ancak tarayıcınızdan <b>1 saniyede</b> kesintisiz izleyebilirsiniz:
+          </p>
+          <div style="background: rgba(217, 191, 135, 0.08); padding: 14px; border-radius: 10px; text-align: left; font-size: 13px; margin: 16px 0; color: #f5efe3;">
+            <b>💡 1 Tıkla Kesintisiz İzleme Yöntemi:</b><br>
+            1. Yukarıdaki <b>"Ekran Paylaş"</b> butonuna tıklayın.<br>
+            2. Açılan pencerede <b>"Sekme"</b>yi seçip filmin açık olduğu sekmeyi işaretleyin.<br>
+            3. Sol alttaki <b>"Sekme Sesini Paylaş"</b> kutucuğunu açın.<br>
+            ✨ <b>Sonuç:</b> Film 1080p, sıfır gecikmeli ve gür sesli olarak tüm izleyicilere canlı akar!
+          </div>
+          <a href="${targetUrl}" target="_blank" class="btn-action">🎬 Filmi Yeni Sekmede Aç</a>
         </div>
-      </div>
+      </body>
+      </html>
     `);
   }
 });
@@ -163,7 +181,7 @@ app.get('/api/extract-video', async (req, res) => {
   try {
     const origin = new URL(targetUrl).origin;
     const fetchHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
       'Referer': origin,
       'Origin': origin,
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
@@ -173,7 +191,7 @@ app.get('/api/extract-video', async (req, res) => {
     const response = await axios.get(targetUrl, {
       headers: fetchHeaders,
       timeout: 15000,
-      maxRedirects: 5
+      maxRedirects: 6
     });
 
     let html = response.data;
@@ -207,7 +225,9 @@ app.get('/api/extract-video', async (req, res) => {
         iframeUrl.includes('dood') ||
         iframeUrl.includes('player') ||
         iframeUrl.includes('embed') ||
-        iframeUrl.includes('vidsrc')
+        iframeUrl.includes('vidsrc') ||
+        iframeUrl.includes('vk.com') ||
+        iframeUrl.includes('superembed')
       )) {
         return res.json({
           success: true,
