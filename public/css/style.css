@@ -1,55 +1,58 @@
 /* ==========================================================================
-   SYNCPARTY / RAVE WATCH PARTY - MODERN BLACK & RED THEME STYLESHEET
+   SYNCPARTY / RAVE WATCH PARTY - COSMIC STARGAZER (LAIKA) THEME STYLESHEET
    ========================================================================== */
 
 :root {
-  --bg-core: #060608;
-  --bg-surface: #0c0c12;
-  --bg-surface-elevated: #14141c;
-  --bg-glass: rgba(14, 14, 20, 0.82);
-  --bg-glass-card: rgba(18, 18, 26, 0.7);
-  --bg-glass-input: rgba(8, 8, 12, 0.85);
+  /* Derin Kozmik Gece Gökyüzü (Petrol / Gece Mavisi) */
+  --bg-core: #091319;
+  --bg-surface: #0e1e27;
+  --bg-surface-elevated: #142a37;
+  --bg-glass: rgba(14, 30, 39, 0.85);
+  --bg-glass-card: rgba(18, 38, 50, 0.75);
+  --bg-glass-input: rgba(9, 19, 25, 0.9);
 
-  /* Daha Koyu Asil Kırmızı Tonları */
-  --accent-red: #b3001e;
-  --accent-red-glow: rgba(179, 0, 30, 0.4);
-  --accent-red-dark: #660011;
-  --accent-crimson: #8b0018;
-  --accent-ruby: #d90429;
-  --accent-purple: #7928ca;
-  --accent-cyan: #00f2fe;
+  /* İllüstrasyondaki Sıcak Ay Altını & Mercan Gezegen Tonları */
+  --accent-red: #d9bf87; /* Sıcak Ay Sarısı / Altın */
+  --accent-red-glow: rgba(217, 191, 135, 0.38);
+  --accent-red-dark: #8c7344;
+  --accent-crimson: #c9aa6d;
+  --accent-ruby: #e8cca0;
+  --accent-gold: #f2e2be;
+  --accent-coral: #d68d71; /* Satürn Gezegen Mercanı */
+  --accent-teal: #7fa197;  /* Pastel Gezegen Yeşili */
+  --accent-cyan: #9eb8af;
 
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-primary: #f5efe3; /* Sıcak Krem Beyazı */
+  --text-secondary: #a3b8c2; /* Kozmik Gümüş Gri */
+  --text-muted: #67808d;
 
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-red: rgba(179, 0, 30, 0.35);
-  --border-red-active: rgba(217, 4, 41, 0.7);
+  --border-subtle: rgba(217, 191, 135, 0.16);
+  --border-red: rgba(217, 191, 135, 0.35);
+  --border-red-active: rgba(232, 204, 160, 0.75);
 
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
   --radius-full: 9999px;
 
-  --shadow-glow: 0 0 25px rgba(179, 0, 30, 0.45);
-  --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 28px rgba(217, 191, 135, 0.35);
+  --shadow-card: 0 12px 36px rgba(0, 0, 0, 0.55);
   --transition-fast: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-smooth: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* OLED Saf Siyah Dark Mod */
+/* OLED Derin Uzay Modu */
 body.theme-oled {
-  --bg-core: #000000;
-  --bg-surface: #040404;
-  --bg-surface-elevated: #090909;
-  --bg-glass: rgba(0, 0, 0, 0.9);
-  --bg-glass-card: rgba(6, 6, 6, 0.85);
-  --bg-glass-input: rgba(2, 2, 2, 0.95);
-  --border-subtle: rgba(255, 255, 255, 0.06);
+  --bg-core: #04080c;
+  --bg-surface: #071018;
+  --bg-surface-elevated: #0c1822;
+  --bg-glass: rgba(5, 12, 18, 0.92);
+  --bg-glass-card: rgba(8, 18, 26, 0.88);
+  --bg-glass-input: rgba(4, 9, 14, 0.96);
+  --border-subtle: rgba(217, 191, 135, 0.12);
 }
 
 /* -------------------------------------------------------------
@@ -89,50 +92,53 @@ html, body {
 }
 
 /* -------------------------------------------------------------
-   NEON ARKA PLAN IŞIKLARI (BG GLOWS)
+   KOZMİK ARKA PLAN IŞIKLARI & GEZEGEN PARILTILARI
    ------------------------------------------------------------- */
 .bg-glow {
   position: fixed;
   border-radius: 50%;
-  filter: blur(120px);
+  filter: blur(100px);
   pointer-events: none;
   z-index: 0;
-  opacity: 0.35;
+  opacity: 0.38;
 }
 
+/* Sağ Üst: Satürn / Mercan Gezegen Parıltısı */
 .bg-glow-1 {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, var(--accent-red) 0%, transparent 70%);
-  top: -100px;
-  right: -50px;
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, #d68d71 0%, rgba(214, 141, 113, 0.2) 50%, transparent 75%);
+  top: -120px;
+  right: -60px;
 }
 
+/* Sol Alt: Pastel Gezegen & Derin Petrol Mavisi */
 .bg-glow-2 {
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, #7928ca 0%, transparent 70%);
-  bottom: -150px;
-  left: -100px;
+  width: 650px;
+  height: 650px;
+  background: radial-gradient(circle, #7fa197 0%, rgba(127, 161, 151, 0.15) 50%, transparent 75%);
+  bottom: -160px;
+  left: -120px;
 }
 
+/* Merkez: Sıcak Ay Sarısı / Altın Parıltı */
 .bg-glow-3 {
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, var(--accent-crimson) 0%, transparent 70%);
-  top: 40%;
-  left: 30%;
-  opacity: 0.15;
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, #d9bf87 0%, rgba(217, 191, 135, 0.2) 50%, transparent 70%);
+  top: 35%;
+  left: 25%;
+  opacity: 0.18;
 }
 
 .bg-glow-room {
-  width: 700px;
-  height: 700px;
-  background: radial-gradient(circle, var(--accent-red) 0%, transparent 70%);
-  top: -200px;
+  width: 800px;
+  height: 800px;
+  background: radial-gradient(circle, rgba(217, 191, 135, 0.25) 0%, rgba(214, 141, 113, 0.12) 45%, transparent 75%);
+  top: -220px;
   left: 50%;
   transform: translateX(-50%);
-  opacity: 0.18;
+  opacity: 0.25;
 }
 
 /* Glassmorphism Paneller */
@@ -147,15 +153,16 @@ html, body {
 
 .glass-card {
   background: var(--bg-glass-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  transition: transform var(--transition-fast), border-color var(--transition-fast);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .glass-card:hover {
-  border-color: var(--border-red);
+  border-color: var(--border-red-active);
+  box-shadow: 0 10px 30px rgba(217, 191, 135, 0.15);
 }
 
 /* -------------------------------------------------------------
@@ -165,6 +172,10 @@ html, body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: 
+    radial-gradient(circle at 85% 15%, rgba(214, 141, 113, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 15% 35%, rgba(217, 191, 135, 0.08) 0%, transparent 35%),
+    linear-gradient(180deg, #091319 0%, #0d1e28 100%);
 }
 
 .lobby-header {
@@ -175,6 +186,8 @@ html, body {
   align-items: center;
   padding: 1.5rem 3rem;
   border-bottom: 1px solid var(--border-subtle);
+  background: rgba(9, 19, 25, 0.6);
+  backdrop-filter: blur(12px);
 }
 
 .brand {
@@ -185,16 +198,17 @@ html, body {
 }
 
 .brand-icon {
-  width: 42px;
-  height: 42px;
-  background: linear-gradient(135deg, var(--accent-red), var(--accent-crimson));
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #d9bf87 0%, #d68d71 100%);
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.3rem;
-  color: #fff;
+  font-size: 1.35rem;
+  color: #091319;
   box-shadow: var(--shadow-glow);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .brand-text {
@@ -205,8 +219,8 @@ html, body {
 .brand-title {
   font-size: 1.4rem;
   font-weight: 800;
-  letter-spacing: 0.05em;
-  color: #fff;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
 }
 
 .brand-accent {
@@ -229,7 +243,7 @@ html, body {
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.35rem 0.85rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(217, 191, 135, 0.08);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-full);
   color: var(--text-secondary);
@@ -284,7 +298,7 @@ html, body {
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #fff 20%, var(--accent-red) 70%, #ff6b8b 100%);
+  background: linear-gradient(135deg, #fff 15%, #d9bf87 55%, #d68d71 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -494,15 +508,16 @@ html, body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent-red), var(--accent-crimson));
-  color: #fff;
-  box-shadow: 0 4px 18px var(--accent-red-glow);
+  background: linear-gradient(135deg, #d9bf87 0%, #c9aa6d 100%);
+  color: #091319;
+  box-shadow: 0 4px 18px rgba(217, 191, 135, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(255, 30, 86, 0.6);
-  filter: brightness(1.1);
+  box-shadow: 0 6px 24px rgba(217, 191, 135, 0.55);
+  filter: brightness(1.08);
 }
 
 .btn-secondary {
@@ -512,17 +527,24 @@ html, body {
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--border-red);
+  background: rgba(217, 191, 135, 0.12);
+  border-color: var(--border-red-active);
+  color: var(--accent-red);
 }
 
 .btn-primary-sm {
   font-size: 0.82rem;
   padding: 0.5rem 0.9rem;
-  background: linear-gradient(135deg, var(--accent-red), var(--accent-crimson));
-  color: #fff;
+  background: linear-gradient(135deg, #d9bf87 0%, #c9aa6d 100%);
+  color: #091319;
+  font-weight: 700;
   border-radius: var(--radius-sm);
-  box-shadow: 0 2px 10px var(--accent-red-glow);
+  box-shadow: 0 2px 10px rgba(217, 191, 135, 0.3);
+}
+
+.btn-primary-sm:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
 }
 
 .btn-secondary-sm {
@@ -535,8 +557,8 @@ html, body {
 }
 
 .btn-secondary-sm:hover {
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
+  border-color: var(--border-red);
+  color: var(--accent-red);
 }
 
 /* Özellikler Grid */
@@ -797,15 +819,19 @@ html, body {
   border: none;
 }
 
-/* Boş Sinema Bekleme Sahnesi */
+/* Boş Sinema Bekleme Sahnesi - Kozmik Uzay Köpeği (Laika) */
 .idle-stage {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center, rgba(179, 0, 30, 0.12) 0%, rgba(10, 10, 15, 0.95) 70%);
+  background: 
+    radial-gradient(circle at center, rgba(9, 19, 25, 0.4) 0%, rgba(9, 19, 25, 0.92) 80%),
+    url('/assets/cosmic-theme.jpg') center center / contain no-repeat;
+  background-color: #091319;
   width: 100%;
   height: 100%;
   text-align: center;
+  position: relative;
 }
 
 .idle-content {
@@ -813,46 +839,53 @@ html, body {
   flex-direction: column;
   align-items: center;
   gap: 0.85rem;
-  padding: 2rem;
-  max-width: 440px;
+  padding: 2.2rem 2.8rem;
+  max-width: 480px;
+  background: rgba(14, 30, 39, 0.78);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(217, 191, 135, 0.15);
 }
 
 .idle-icon-pulse {
-  width: 70px;
-  height: 70px;
+  width: 74px;
+  height: 74px;
   border-radius: 50%;
-  background: rgba(179, 0, 30, 0.2);
-  border: 1px solid var(--border-red);
+  background: linear-gradient(135deg, rgba(217, 191, 135, 0.25), rgba(214, 141, 113, 0.2));
+  border: 1px solid var(--border-red-active);
   color: var(--accent-red);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
-  box-shadow: 0 0 25px var(--accent-red-glow);
+  font-size: 2.2rem;
+  box-shadow: 0 0 30px rgba(217, 191, 135, 0.35);
   animation: pulse-slow 3s infinite alternate;
 }
 
 @keyframes pulse-slow {
-  0% { transform: scale(0.95); box-shadow: 0 0 15px var(--accent-red-glow); }
-  100% { transform: scale(1.08); box-shadow: 0 0 35px var(--accent-red-glow); }
+  0% { transform: scale(0.95); box-shadow: 0 0 18px rgba(217, 191, 135, 0.25); }
+  100% { transform: scale(1.08); box-shadow: 0 0 38px rgba(217, 191, 135, 0.55); }
 }
 
 .idle-title {
-  font-size: 1.3rem;
+  font-size: 1.35rem;
   font-weight: 800;
-  color: #fff;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
 }
 
 .idle-desc {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   color: var(--text-secondary);
   line-height: 1.5;
 }
 
 .btn-idle-pick {
   margin-top: 0.5rem;
-  padding: 0.65rem 1.4rem;
-  font-size: 0.9rem;
+  padding: 0.75rem 1.6rem;
+  font-size: 0.95rem;
 }
 
 /* HTML5 Video */
