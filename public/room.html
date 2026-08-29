@@ -123,11 +123,21 @@
           </div>
         </div>
 
-        <!-- 4. Harici Film Siteleri Proxy Embed Oynatıcısı (Tam Kontrol & Kalite Seçimi Uyumlu) -->
+        <!-- 4. Harici Film Siteleri Proxy Embed Oynatıcısı (Host Kontrollü & Kaydırma Destekli) -->
         <div id="embed-player-container" class="player-layer hidden">
           <div id="embed-viewer-shield" class="embed-viewer-shield hidden">
-            <div class="shield-tag">
-              <i class="fa-solid fa-lock"></i> Oynatma ve İlerleme Host Kontrolündedir
+            <div class="shield-header-bar">
+              <div class="shield-tag">
+                <i class="fa-solid fa-lock"></i> Oynatma ve İlerleme Host Kontrolündedir
+              </div>
+              <div class="shield-scroll-controls">
+                <button type="button" id="btn-shield-scroll-down" class="shield-scroll-btn" title="Filmi görmek için sayfayı aşağı kaydır">
+                  <i class="fa-solid fa-arrow-down"></i> Ekranı Aşağı Kaydır
+                </button>
+                <button type="button" id="btn-shield-scroll-up" class="shield-scroll-btn" title="Sayfayı yukarı kaydır">
+                  <i class="fa-solid fa-arrow-up"></i> Yukarı
+                </button>
+              </div>
             </div>
           </div>
           <iframe id="proxy-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>

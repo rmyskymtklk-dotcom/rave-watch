@@ -59,6 +59,7 @@ class SyncEngine {
     this.initSocketEvents();
     this.setupVolume();
     this.setupBackgroundPlayback();
+    this.setupShieldScrolling();
   }
 
   // -----------------------------------------------------------
@@ -851,13 +852,9 @@ class SyncEngine {
     this.updateEmbedShield();
   }
 
-  // İzleyici İçin İframe Bilgilendirmesi (Sayfada Aşağı Kaydırmaya ve Gezinmeye Engel Olmaz)
+  // İzleyici İçin İframe Kalkanı (İzleyicinin İlerletmesini Kökten Engeller + Sayfada Aşağı İnmesine Olanak Tanır)
   updateEmbedShield() {
     const shield = document.getElementById('embed-viewer-shield');
-    if (this.embedIframe) {
-      this.embedIframe.style.pointerEvents = 'auto'; // İzleyici ve Host her zaman sayfada aşağı inebilir, bölümleri seçebilir
-    }
-
     if (this.currentMediaType === 'embed') {
       if (!this.isHost && this.hostOnlyControl) {
         if (shield) shield.classList.remove('hidden');
@@ -870,10 +867,72 @@ class SyncEngine {
 
     if (this.html5Video) {
       if (this.currentMediaType === 'html5' && !this.isHost && this.hostOnlyControl) {
-        this.html5Video.style.pointerEvents = 'none'; // İzleyici doğrudan videoyu durdurup saramaz, host yönetir
+        this.html5Video.style.pointerEvents = 'none';
       } else {
         this.html5Video.style.pointerEvents = 'auto';
       }
     }
+  }
+
+  // Kalkan Üzerinden Güvenli ve Akıcı Sayfa Kaydırma (Tıklama Yok, Sadece Kaydırma)
+  setupShieldScrolling() {
+    const shield = document.getElementById('embed-viewer-shield');
+    const iframe = document.getElementById('proxy-iframe');
+    const btnDown = document.getElementById('btn-shield-scroll-down');
+    const btnUp = document.getElementById('btn-shield-scroll-up');
+
+    if (!shield || !iframe) return;
+
+    const doScroll = (amount) => {
+      try {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.scrollBy({ top: amount, behavior: 'smooth' });
+        }
+      } catch(e) {}
+    };
+
+    if (btnDown) {
+      btnDown.addEventListener('click', (e) => {
+        e.stopPropagation();
+        doScroll(450);
+      });
+    }
+
+    if (btnUp) {
+      btnUp.addEventListener('click', (e) => {
+        e.stopPropagation();
+        doScroll(-450);
+      });
+    }
+
+    // Fare tekerleği ile sayfayı aşağı/yukarı kaydır
+    shield.addEventListener('wheel', (e) => {
+      try {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.scrollBy({ top: e.deltaY, behavior: 'auto' });
+        }
+      } catch(e) {}
+    }, { passive: true });
+
+    // Dokunmatik kaydırma (Mobil & Tablet)
+    let touchStartY = 0;
+    shield.addEventListener('touchstart', (e) => {
+      if (e.touches && e.touches[0]) {
+        touchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    shield.addEventListener('touchmove', (e) => {
+      if (e.touches && e.touches[0]) {
+        const currentY = e.touches[0].clientY;
+        const deltaY = touchStartY - currentY;
+        touchStartY = currentY;
+        try {
+          if (iframe.contentWindow) {
+            iframe.contentWindow.scrollBy({ top: deltaY, behavior: 'auto' });
+          }
+        } catch(e) {}
+      }
+    }, { passive: true });
   }
 }

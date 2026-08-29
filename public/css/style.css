@@ -1040,24 +1040,36 @@ html, body {
   display: block;
 }
 
-/* İzleyici İçin İframe Bilgilendirme Rozeti (Aşağı Kaydırmaya ve Sayfa İçeriğine Engel Olmaz) */
+/* İzleyici İçin İframe Kalkanı (İzleyicinin İlerletmesini Kökten Engeller + Sayfada Aşağı İnmesine Olanak Tanır) */
 .embed-viewer-shield {
   position: absolute !important;
-  top: 14px !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
   z-index: 15 !important;
-  width: auto !important;
-  height: auto !important;
-  background: transparent !important;
+  background: rgba(0, 0, 0, 0.001) !important;
   display: flex !important;
+  flex-direction: column !important;
   align-items: center !important;
-  justify-content: center !important;
-  pointer-events: none !important;
+  justify-content: flex-start !important;
+  padding-top: 14px !important;
+  pointer-events: auto !important;
+  cursor: default !important;
+  touch-action: pan-y !important;
 }
 
 .embed-viewer-shield.hidden {
   display: none !important;
+  pointer-events: none !important;
+}
+
+.shield-header-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  pointer-events: auto;
 }
 
 .shield-tag {
@@ -1073,6 +1085,35 @@ html, body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   letter-spacing: 0.02em;
+}
+
+.shield-scroll-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shield-scroll-btn {
+  background: rgba(229, 9, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  padding: 0.35rem 0.85rem;
+  border-radius: 18px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  pointer-events: auto;
+}
+
+.shield-scroll-btn:hover {
+  background: #ff1e56;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(229, 9, 20, 0.6);
 }
 
 .webrtc-live-badge {
