@@ -183,6 +183,7 @@ class WebRTCShareEngine {
       this.captureVideo.srcObject = stream;
       await this.captureVideo.play().catch(() => {});
 
+      // Host için de katmanı göster (hem host hem izleyici görür)
       this._showLayer();
       this._startFrameLoop();
 
@@ -228,7 +229,12 @@ class WebRTCShareEngine {
     this.lastEncodingTime = Date.now();
 
     this.frameTimer = setInterval(() => {
-      if (!this.isSharing || !this.captureVideo.videoWidth) return;
+      if (!this.isSharing) return;
+
+      // Gerçek video boyutlarını her karede al (tanımsız vw/vh hatası yoktur)
+      const vw = this.captureVideo.videoWidth;
+      const vh = this.captureVideo.videoHeight;
+      if (!vw || !vh) return;
 
       if (this.isEncoding) {
         if (Date.now() - this.lastEncodingTime > 150) {
@@ -241,8 +247,8 @@ class WebRTCShareEngine {
       this.isEncoding = true;
       this.lastEncodingTime = Date.now();
 
-      // ⚡ Yüksek Performanslı, Sıfır Gecikmeli & Kristal Netlikte 1152px Akış
-      const scale = Math.min(1, 1152 / vw);
+      // ⚡ Yüksek Performanslı, Sıfır Gecikmeli & Kristal Netlikte Akış
+      const scale = Math.min(1, 1280 / vw);
       const tw = Math.round(vw * scale);
       const th = Math.round(vh * scale);
 
@@ -252,7 +258,7 @@ class WebRTCShareEngine {
       }
       this.outCtx.drawImage(this.captureVideo, 0, 0, tw, th);
 
-      // Host önizleme canvas'ı
+      // Host önizleme canvas'ı — izleyicide ve hostta görünür
       if (this.canvas && this.ctx) {
         if (this.canvas.width !== tw || this.canvas.height !== th) {
           this.canvas.width = tw;
@@ -261,15 +267,15 @@ class WebRTCShareEngine {
         this.ctx.drawImage(this.outCanvas, 0, 0);
       }
 
-      // ⚡ Optimize 0.62 JPEG (Sadece ~28 KB per frame - Ağ asla tıkanmaz, mesajlar ve video 0ms anında iletilir)
+      // ⚡ Optimize JPEG (Ağ asla tıkanmaz, mesajlar ve video 0ms anında iletilir)
       this.outCanvas.toBlob((blob) => {
         this.isEncoding = false;
         if (blob && this.isSharing) {
           this.lastEncodedBlob = blob;
           this.socket.emit('screenshare-frame', blob);
         }
-      }, 'image/jpeg', 0.62);
-    }, 40); // 25 FPS Sinematik Akıcılık (Bufferbloat & Lag Önleyici)
+      }, 'image/jpeg', 0.70);
+    }, 40); // 25 FPS
   }
 
   // ================================================================

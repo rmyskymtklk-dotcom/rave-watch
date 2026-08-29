@@ -212,9 +212,10 @@ html, body {
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem 3rem;
-  border-bottom: 1px solid var(--border-subtle);
-  background: rgba(9, 19, 25, 0.6);
-  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(217, 191, 135, 0.15);
+  background: rgba(9, 19, 25, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .brand {
@@ -328,7 +329,7 @@ html, body {
 
 .lobby-container {
   position: relative;
-  z-index: 10;
+  z-index: 2;
   max-width: 1080px;
   margin: 0 auto;
   padding: 3rem 1.5rem;
@@ -385,7 +386,17 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  border-color: var(--border-red);
+  border-color: rgba(217, 191, 135, 0.35);
+}
+
+/* Cam Şeffaf Panel — Arka plan görünür */
+.glass-panel {
+  background: rgba(9, 19, 25, 0.38) !important;
+  backdrop-filter: blur(22px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(1.4) !important;
+  border: 1px solid rgba(217, 191, 135, 0.28) !important;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .section-block {
@@ -410,8 +421,10 @@ html, body {
 
 .cyber-input {
   width: 100%;
-  background: var(--bg-glass-input);
-  border: 1px solid var(--border-subtle);
+  background: rgba(9, 19, 25, 0.50);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(217, 191, 135, 0.22);
   color: #fff;
   font-family: var(--font-sans);
   font-size: 0.95rem;
@@ -422,9 +435,9 @@ html, body {
 }
 
 .cyber-input:focus {
-  border-color: var(--accent-red);
-  box-shadow: 0 0 15px rgba(255, 30, 86, 0.25);
-  background: rgba(14, 14, 22, 0.95);
+  border-color: rgba(217, 191, 135, 0.7);
+  box-shadow: 0 0 15px rgba(217, 191, 135, 0.2);
+  background: rgba(9, 19, 25, 0.65);
 }
 
 .code-input {

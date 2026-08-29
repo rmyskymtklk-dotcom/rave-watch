@@ -63,116 +63,160 @@ function getOrCreateRoom(roomId) {
 // -------------------------------------------------------------
 
 /**
- * 1. Evrensel Iframe Embed Proxy'si (/api/proxy-embed)
- * X-Frame-Options, CSP, Frame-Busting scriptlerini ve Cloudflare/WAF başlıklarını temizler.
+ * 1. TAM TERS PROXY (Full Reverse Proxy) — /api/proxy-embed
+ * Cloudflare korumalı filmmakinesi.to, dizibox, hdfilm vb. tüm siteler için.
+ * Sayfanın tüm alt kaynaklarını (CSS, JS, resim) da proxy üzerinden yükler.
+ * Frame-busting, X-Frame-Options ve CSP başlıklarını kaldırır.
  */
 app.get('/api/proxy-embed', async (req, res) => {
   const targetUrl = req.query.url;
-  if (!targetUrl) {
-    return res.status(400).send('URL parametresi gereklidir.');
-  }
+  if (!targetUrl) return res.status(400).send('URL parametresi gereklidir.');
+
+  let parsedUrl;
+  try { parsedUrl = new URL(targetUrl); } catch(e) { return res.status(400).send('Geçersiz URL'); }
+
+  const origin = `${parsedUrl.protocol}//${parsedUrl.host}`;
+  const proxyBase = `/api/proxy-embed?url=`;
+
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.6613.120 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Accept-Encoding': 'identity',
+    'Referer': origin + '/',
+    'sec-ch-ua': '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'document',
+    'sec-fetch-mode': 'navigate',
+    'sec-fetch-site': 'none',
+    'sec-fetch-user': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+  };
+
+  // Kullanıcıdan gelen cookie varsa ilet
+  if (req.headers.cookie) headers['Cookie'] = req.headers.cookie;
 
   try {
-    const parsedUrl = new URL(targetUrl);
-    const origin = `${parsedUrl.protocol}//${parsedUrl.host}`;
-
     const response = await axios.get(targetUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Referer': origin,
-        'Origin': origin,
-        'sec-ch-ua': '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
-        'sec-fetch-dest': 'iframe',
-        'sec-fetch-mode': 'navigate',
-        'sec-fetch-site': 'cross-site',
-        'Upgrade-Insecure-Requests': '1'
-      },
-      responseType: 'text',
-      timeout: 25000,
-      maxRedirects: 8
+      headers,
+      responseType: 'arraybuffer',
+      timeout: 20000,
+      maxRedirects: 10,
+      validateStatus: () => true,
     });
 
-    let html = response.data;
+    const contentType = (response.headers['content-type'] || 'text/html').toLowerCase();
 
-    // Frame-Busting Korumasını Kökten Temizle
-    html = html.replace(/top\.location\s*=/gi, '/* anti-frame */ window.location =');
-    html = html.replace(/window\.top\s*!==\s*window\.self/gi, 'false');
-    html = html.replace(/top\s*!==\s*self/gi, 'false');
-    html = html.replace(/top\.location\.href/gi, 'window.location.href');
-    html = html.replace(/parent\.location/gi, 'window.location');
-
-    // Güvenlik kısıtlamalarını kaldıran başlıklar
+    // Güvenlik başlıklarını kaldır
     res.removeHeader('X-Frame-Options');
     res.removeHeader('Content-Security-Policy');
     res.removeHeader('X-Content-Type-Options');
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.removeHeader('Strict-Transport-Security');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', contentType.includes('charset') ? contentType : contentType + '; charset=utf-8');
 
-    // Base tag & Reklam/Popup Engelleyici Script & Video %100 Genişletici
-    const injectScripts = `<base href="${targetUrl}">
-    <script>
-      try {
-        Object.defineProperty(window, 'top', { get: function() { return window.self; } });
-        Object.defineProperty(window, 'parent', { get: function() { return window.self; } });
-        window.open = function() { return null; };
-      } catch(e) {}
-    </script>
-    <style>
-      html, body { width: 100% !important; height: 100% !important; margin: 0 !important; padding: 0 !important; background: #000 !important; overflow: hidden !important; }
-      iframe, video, #player, .jwplayer, .video-js, .plyr, .player-container { width: 100% !important; height: 100% !important; max-width: 100vw !important; max-height: 100vh !important; }
-      iframe[src*="ad"], .ad-box, .banner-ad, [class*="reklam"], [id*="reklam"], #popunder, .popunder, [class*="popup"] { display: none !important; opacity: 0 !important; pointer-events: none !important; }
-    </style>`;
+    // Sadece HTML sayfalarını dönüştür
+    if (contentType.includes('text/html')) {
+      let html = response.data.toString('utf8');
 
-    if (html.includes('<head>')) {
-      html = html.replace('<head>', `<head>${injectScripts}`);
-    } else {
-      html = `${injectScripts}${html}`;
+      // Frame-Busting scriptlerini etkisiz kıl
+      html = html.replace(/top\.location\s*[=!]/gi, m => m.includes('=') ? '/* fb */ void(0)//' : '/* fb */ true ||');
+      html = html.replace(/window\.top\s*!==\s*window\.self/gi, 'false');
+      html = html.replace(/top\s*!==\s*self/gi, 'false');
+      html = html.replace(/top\.location\.href/gi, 'window.location.href');
+      html = html.replace(/parent\.location/gi, 'window.location');
+      html = html.replace(/top\.location\s*=/gi, '/* fb */ window.location =');
+
+      // Tüm mutlak ve göreli URL'leri proxy üzerinden yeniden yaz
+      const rewriteUrl = (url) => {
+        if (!url || url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('#') || url.startsWith('javascript:')) return url;
+        if (url.startsWith('//')) url = parsedUrl.protocol + url;
+        else if (url.startsWith('/')) url = origin + url;
+        else if (!url.startsWith('http')) url = origin + parsedUrl.pathname.replace(/\/[^/]*$/, '/') + url;
+        return proxyBase + encodeURIComponent(url);
+      };
+
+      // href, src, action, srcset linklerini yeniden yaz
+      html = html.replace(/\b(href|src|action)=["']([^"'#][^"']*?)["']/gi, (match, attr, url) => {
+        // CSS/JS/Font/Image kaynaklarını proxy'de tut
+        return `${attr}="${rewriteUrl(url)}"`;
+      });
+
+      // CSS url() içindeki kaynakları yeniden yaz
+      html = html.replace(/url\(["']?(https?:\/\/[^"')]+)["']?\)/gi, (match, url) => {
+        return `url("${rewriteUrl(url)}")`;
+      });
+
+      // Base tag ile kök url'yi sabitle (href yeniden yazımını destekler)
+      const inject = `
+<script>
+  // Frame Buster Bypass
+  try {
+    Object.defineProperty(window, 'top', { get: () => window.self, configurable: true });
+    Object.defineProperty(window, 'parent', { get: () => window.self, configurable: true });
+    window.open = () => null;
+  } catch(e) {}
+</script>
+<style>
+  html, body { width:100%!important; height:100%!important; margin:0!important; padding:0!important; background:#000!important; overflow:hidden!important; }
+  video, #player, .jwplayer, .video-js, .plyr, .player-container, [id*="player"], [class*="player"] {
+    width:100%!important; height:100%!important; max-width:100vw!important; max-height:100vh!important;
+  }
+  .ad-box,.banner-ad,[class*="reklam"],[id*="reklam"],#popunder,.popunder,[class*="popup"],[id*="popup"],
+  .cookie-notice,.gdpr-bar,.notice-bar { display:none!important; }
+</style>`;
+
+      if (html.includes('<head>')) {
+        html = html.replace('<head>', '<head>' + inject);
+      } else if (html.includes('<html')) {
+        html = html.replace(/<html[^>]*>/, m => m + inject);
+      } else {
+        html = inject + html;
+      }
+
+      return res.send(html);
     }
 
-    res.send(html);
+    // HTML olmayan kaynaklar (CSS, JS, images) — doğrudan stream et
+    res.status(response.status).send(Buffer.from(response.data));
+
   } catch (error) {
-    console.error('Proxy Hatası:', error.message);
-    // Cloudflare / Bot Koruması Olduğunda Kullanıcı Dostu Doğrudan Çözüm
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { background: #091319; color: #f5efe3; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
-          .proxy-card { background: rgba(14, 30, 39, 0.9); border: 1px solid rgba(217, 191, 135, 0.3); border-radius: 16px; padding: 32px; max-width: 520px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
-          .btn-action { display: inline-block; margin-top: 18px; padding: 12px 24px; background: linear-gradient(135deg, #d9bf87, #c9aa6d); color: #091319; font-weight: 700; border-radius: 10px; text-decoration: none; }
-        </style>
-      </head>
-      <body>
-        <div class="proxy-card">
-          <div style="font-size: 40px; margin-bottom: 12px;">🛡️</div>
-          <h2 style="margin: 0 0 10px 0; color: #d9bf87;">Bu Film Sitesi Cloudflare Korumalı</h2>
-          <p style="color: #a3b8c2; font-size: 14px; line-height: 1.6;">
-            Bu film sitesi sunucu bazlı çekimleri engelliyor. Ancak tarayıcınızdan <b>1 saniyede</b> kesintisiz izleyebilirsiniz:
-          </p>
-          <div style="background: rgba(217, 191, 135, 0.08); padding: 14px; border-radius: 10px; text-align: left; font-size: 13px; margin: 16px 0; color: #f5efe3;">
-            <b>💡 1 Tıkla Kesintisiz İzleme Yöntemi:</b><br>
-            1. Yukarıdaki <b>"Ekran Paylaş"</b> butonuna tıklayın.<br>
-            2. Açılan pencerede <b>"Sekme"</b>yi seçip filmin açık olduğu sekmeyi işaretleyin.<br>
-            3. Sol alttaki <b>"Sekme Sesini Paylaş"</b> kutucuğunu açın.<br>
-            ✨ <b>Sonuç:</b> Film 1080p, sıfır gecikmeli ve gür sesli olarak tüm izleyicilere canlı akar!
-          </div>
-          <a href="${targetUrl}" target="_blank" class="btn-action">🎬 Filmi Yeni Sekmede Aç</a>
-        </div>
-      </body>
-      </html>
-    `);
+    console.error('[Proxy] Hata:', error.message);
+    // Cloudflare / Bot Koruması — Kullanıcıya yol göster
+    res.send(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8">
+<style>
+  body { background:#091319; color:#f5efe3; font-family:sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
+  .card { background:rgba(14,30,39,0.9); border:1px solid rgba(217,191,135,0.3); border-radius:16px; padding:28px; max-width:500px; text-align:center; }
+  h2 { color:#d9bf87; margin:0 0 12px; }
+  p { color:#a3b8c2; font-size:14px; line-height:1.6; }
+  .steps { background:rgba(217,191,135,0.06); padding:14px; border-radius:10px; text-align:left; font-size:13px; margin:14px 0; }
+  a.btn { display:inline-block; margin-top:14px; padding:11px 22px; background:linear-gradient(135deg,#d9bf87,#c9aa6d); color:#091319; font-weight:700; border-radius:10px; text-decoration:none; }
+</style></head>
+<body><div class="card">
+  <div style="font-size:38px;margin-bottom:10px">🛡️</div>
+  <h2>Cloudflare Korumalı Site</h2>
+  <p>Bu film sitesi bot koruması kullanıyor. Aşağıdaki yöntemle <b>0 sorunla</b> izleyebilirsiniz:</p>
+  <div class="steps">
+    <b>💡 Garantili Çözüm — Sekme Paylaşımı:</b><br><br>
+    1. Aşağıdaki "Yeni Sekmede Aç" butonuna tıklayın<br>
+    2. Filmi o sekmede başlatın<br>
+    3. Odaya dönüp <b>"Ekran Paylaş" → "Sekme"</b>'yi seçin<br>
+    4. <b>"Sekme sesini paylaş"</b> kutusunu işaretleyin<br>
+    ✨ Film ve ses tüm izleyicilere akar!
+  </div>
+  <a href="${targetUrl}" target="_blank" class="btn">🎬 Filmi Yeni Sekmede Aç</a>
+</div></body></html>`);
   }
 });
 
 /**
- * 2. Gelişmiş Otomatik Video & Iframe Player Çıkarıcı (/api/extract-video)
- * DiziBox, HDFilmcehennemi, VidMoly, Upstream, FileLions ve film sayfalarını derinlemesine tarar.
+ * 2. Gelişmiş Video & Iframe Player Çıkarıcı (/api/extract-video)
+ * DiziBox, HDFilmcehennemi, VidMoly, Upstream, FileLions vb. sayfaları tarar.
  */
 app.get('/api/extract-video', async (req, res) => {
   const targetUrl = req.query.url;
@@ -181,94 +225,60 @@ app.get('/api/extract-video', async (req, res) => {
   try {
     const origin = new URL(targetUrl).origin;
     const fetchHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.6613.120 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8',
       'Referer': origin,
-      'Origin': origin,
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      'sec-fetch-mode': 'navigate',
+      'sec-fetch-site': 'none',
     };
 
-    // 1. Ana sayfayı çek
     const response = await axios.get(targetUrl, {
-      headers: fetchHeaders,
-      timeout: 15000,
-      maxRedirects: 6
+      headers: fetchHeaders, timeout: 15000, maxRedirects: 8, validateStatus: () => true,
     });
 
     let html = response.data;
     if (typeof html !== 'string') html = JSON.stringify(html);
 
     // Doğrudan .m3u8 veya .mp4 tespiti
-    let m3u8Match = html.match(/(https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*)/i);
-    let mp4Match = html.match(/(https?:\/\/[^"'\s\\]+\.mp4[^"'\s\\]*)/i);
+    const m3u8Match = html.match(/(https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*)/i);
+    const mp4Match = html.match(/(https?:\/\/[^"'\s\\]+\.mp4[^"'\s\\]*)/i);
 
-    if (m3u8Match) {
-      return res.json({ success: true, streamUrl: m3u8Match[1].replace(/\\/g, ''), type: 'hls' });
-    }
-    if (mp4Match) {
-      return res.json({ success: true, streamUrl: mp4Match[1].replace(/\\/g, ''), type: 'mp4' });
-    }
+    if (m3u8Match) return res.json({ success: true, streamUrl: m3u8Match[1].replace(/\\/g, ''), type: 'hls' });
+    if (mp4Match) return res.json({ success: true, streamUrl: mp4Match[1].replace(/\\/g, ''), type: 'mp4' });
 
-    // 2. Sayfadaki gömülü video player iframe'lerini tara (vidmoly, upstream, closeload, streamwish, doodstream vb.)
+    // Sayfadaki gömülü video player iframe'lerini tara
     const iframeMatches = [...html.matchAll(/<iframe[^>]+src=["']([^"']+)["']/gi)];
+    const playerKeywords = ['vidmoly','upstream','closeload','filelions','streamwish','dood','player','embed','vidsrc','vk.com','superembed','fembed','streamtape','mixdrop'];
     for (const match of iframeMatches) {
       let iframeUrl = match[1];
       if (iframeUrl.startsWith('//')) iframeUrl = 'https:' + iframeUrl;
       else if (iframeUrl.startsWith('/')) iframeUrl = origin + iframeUrl;
-
-      // Video player iframe'i mi?
-      if (iframeUrl.includes('http') && (
-        iframeUrl.includes('vidmoly') ||
-        iframeUrl.includes('upstream') ||
-        iframeUrl.includes('closeload') ||
-        iframeUrl.includes('filelions') ||
-        iframeUrl.includes('streamwish') ||
-        iframeUrl.includes('dood') ||
-        iframeUrl.includes('player') ||
-        iframeUrl.includes('embed') ||
-        iframeUrl.includes('vidsrc') ||
-        iframeUrl.includes('vk.com') ||
-        iframeUrl.includes('superembed')
-      )) {
-        return res.json({
-          success: true,
-          streamUrl: `/api/proxy-embed?url=${encodeURIComponent(iframeUrl)}`,
-          type: 'embed',
-          isDirectPlayer: true
-        });
+      if (!iframeUrl.startsWith('http')) continue;
+      if (playerKeywords.some(k => iframeUrl.includes(k))) {
+        return res.json({ success: true, streamUrl: `/api/proxy-embed?url=${encodeURIComponent(iframeUrl)}`, type: 'embed', isDirectPlayer: true });
       }
     }
 
-    // İlk geçerli iframe'i döndür
+    // Genel iframe varsa kullan
     for (const match of iframeMatches) {
       let iframeUrl = match[1];
       if (iframeUrl.startsWith('//')) iframeUrl = 'https:' + iframeUrl;
       else if (iframeUrl.startsWith('/')) iframeUrl = origin + iframeUrl;
-
-      if (iframeUrl.includes('http') && !iframeUrl.includes('google') && !iframeUrl.includes('disqus') && !iframeUrl.includes('facebook')) {
-        return res.json({
-          success: true,
-          streamUrl: `/api/proxy-embed?url=${encodeURIComponent(iframeUrl)}`,
-          type: 'embed'
-        });
+      if (iframeUrl.startsWith('http') && !iframeUrl.includes('google') && !iframeUrl.includes('disqus') && !iframeUrl.includes('facebook')) {
+        return res.json({ success: true, streamUrl: `/api/proxy-embed?url=${encodeURIComponent(iframeUrl)}`, type: 'embed' });
       }
     }
 
-    return res.json({
-      success: true,
-      streamUrl: `/api/proxy-embed?url=${encodeURIComponent(targetUrl)}`,
-      type: 'embed'
-    });
+    // Her şey başarısız → tam sayfayı proxy'le
+    return res.json({ success: true, streamUrl: `/api/proxy-embed?url=${encodeURIComponent(targetUrl)}`, type: 'embed' });
   } catch (err) {
-    return res.json({
-      success: true,
-      streamUrl: `/api/proxy-embed?url=${encodeURIComponent(targetUrl)}`,
-      type: 'embed'
-    });
+    return res.json({ success: true, streamUrl: `/api/proxy-embed?url=${encodeURIComponent(targetUrl)}`, type: 'embed' });
   }
 });
 
 /**
- * 2. Medya Akışı Proxy'si (/api/proxy-media)
+ * 3. Medya Akışı Proxy'si (/api/proxy-media)
  * Video akışlarını (MP4/HLS/m3u8) CORS korumasını atlatıp istemciye stream eder.
  */
 app.get('/api/proxy-media', async (req, res) => {
