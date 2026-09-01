@@ -29,6 +29,15 @@ app.use(express.static(path.join(__dirname, 'public'), {
   etag: true
 }));
 
+// Oda Sayfası Rotaları (Sayfa Yenilemede 404 Almayı ve Oda Kaybını Kökten Önler)
+app.get('/room/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'room.html'));
+});
+
+app.get('/room', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'room.html'));
+});
+
 // Oda Verileri (Hafıza Yönetimi)
 const rooms = new Map();
 
@@ -475,17 +484,24 @@ io.on('connection', (socket) => {
 
     let isHost = false;
 
-    // 1. Oda yeni mi veya sahibi geri mi döndü?
+    // 1. Oda yeni mi veya sahibi geri mi döndü? (F5 ve Kodla Yeniden Giriş Korumalı)
     if (room.hostToken && room.hostToken === userToken) {
-      // Odanın gerçek sahibi F5 attı / geri geldi
       room.hostId = socket.id;
       isHost = true;
       if (room.hostDisconnectTimer) {
         clearTimeout(room.hostDisconnectTimer);
         room.hostDisconnectTimer = null;
       }
-    } else if (!room.hostToken && (isCreator || room.users.size === 0)) {
-      // Odayı ilk oluşturan kişi
+    } else if (isCreator) {
+      // Odayı oluşturan kişi odaya geri döndü (F5 veya kodla giriş) - Hostluğu Geri Ver
+      room.hostToken = userToken;
+      room.hostId = socket.id;
+      isHost = true;
+      if (room.hostDisconnectTimer) {
+        clearTimeout(room.hostDisconnectTimer);
+        room.hostDisconnectTimer = null;
+      }
+    } else if (!room.hostToken || room.users.size === 0) {
       room.hostToken = userToken;
       room.hostId = socket.id;
       isHost = true;
@@ -494,7 +510,7 @@ io.on('connection', (socket) => {
         room.hostDisconnectTimer = null;
       }
     } else {
-      // Kesinlikle İZLEYİCİ (Asla Host yapılamaz)
+      // Kesinlikle İZLEYİCİ (Hostluk gasp edilemez)
       isHost = false;
     }
 
@@ -784,7 +800,7 @@ io.on('connection', (socket) => {
 
       console.log(`[-] ${currentUser ? currentUser.username : socket.id} ayrıldı: ${currentRoomId}`);
 
-      // Eğer ayrılan kişi Host ise, 3 dakika (180 saniye) bekle (Sayfa yenilemede Host değişmesin!)
+      // Eğer ayrılan kişi Host ise, 10 dakika bekle (Sayfa yenilemede izleyici host olmasın!)
       if (room.hostId === socket.id) {
         room.hostDisconnectTimer = setTimeout(() => {
           if (rooms.has(currentRoomId)) {
@@ -792,7 +808,6 @@ io.on('connection', (socket) => {
             if (currentRoom.users.size > 0 && currentRoom.hostId === socket.id) {
               const nextHost = currentRoom.users.values().next().value;
               currentRoom.hostId = nextHost.id;
-              currentRoom.hostToken = nextHost.userToken;
               nextHost.isHost = true;
 
               io.to(currentRoomId).emit('host-transferred', {
@@ -801,7 +816,7 @@ io.on('connection', (socket) => {
               });
             }
           }
-        }, 180000); // 3 Dakika (180 saniye)
+        }, 600000); // 10 Dakika (Sayfa yenilemede hostluk asla izleyiciye geçmez)
       }
 
       // Odadakilere güncelleme gönder
@@ -810,14 +825,14 @@ io.on('connection', (socket) => {
         users: Array.from(room.users.values())
       });
 
-      // Oda tamamen boşaldıysa 1 saat sonra temizle (zaman kısıtlamasını engellemek için)
+      // Oda tamamen boşaldıysa 6 saat sonra temizle (oda kodu ve geçmiş korunur)
       if (room.users.size === 0) {
         setTimeout(() => {
           if (rooms.has(currentRoomId) && rooms.get(currentRoomId).users.size === 0) {
             rooms.delete(currentRoomId);
             console.log(`[x] Boş oda silindi: ${currentRoomId}`);
           }
-        }, 3600000); // 1 saat
+        }, 21600000); // 6 saat
       }
     }
   });

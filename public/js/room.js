@@ -66,13 +66,13 @@ class RoomEngine {
   }
 
   getRoomIdFromUrl() {
-    const pathParts = window.location.pathname.split('/');
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
     let roomId = pathParts[pathParts.length - 1];
     if (!roomId || roomId === 'room.html' || roomId === 'room') {
       const urlParams = new URLSearchParams(window.location.search);
       roomId = urlParams.get('room') || 'AB42';
     }
-    return roomId.toUpperCase();
+    return roomId.trim().toUpperCase();
   }
 
   initTheme() {
@@ -113,18 +113,18 @@ class RoomEngine {
       this.socket.emit('heartbeat-pong');
     });
 
-    // Odaya Bağlanma (Kalıcı Host Kimliği - Sekme ve Yenileme Korumalı)
+    // Odaya Bağlanma (Kalıcı Host Kimliği - F5 Yenileme ve Kodla Giriş Korumalı)
     const username = localStorage.getItem('sync_username') || `İzleyici ${Math.floor(10 + Math.random() * 90)}`;
     const avatarColor = localStorage.getItem('sync_accent_color') || localStorage.getItem('sync_color') || '#b3001e';
     
-    // Her sekmenin kendi bağımsız token'ı olur ve F5 yenilemede korunur
-    let userToken = sessionStorage.getItem('sync_user_token');
+    // Kalıcı kullanıcı kimliği (F5 veya yeni sekmede korunur)
+    let userToken = localStorage.getItem('sync_user_token');
     if (!userToken) {
-      userToken = 'tok_' + Math.random().toString(36).substr(2, 9) + Date.now();
-      sessionStorage.setItem('sync_user_token', userToken);
+      userToken = 'usr_' + Math.random().toString(36).substr(2, 9) + Date.now();
+      localStorage.setItem('sync_user_token', userToken);
     }
 
-    const isCreator = sessionStorage.getItem('sync_room_host_' + this.roomId.toLowerCase()) === 'true';
+    const isCreator = localStorage.getItem('sync_room_owner_' + this.roomId.toLowerCase()) === 'true';
 
     this.socket.emit('join-room', {
       roomId: this.roomId,

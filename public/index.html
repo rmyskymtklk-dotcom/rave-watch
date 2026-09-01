@@ -224,11 +224,11 @@
     document.getElementById('create-room-btn').addEventListener('click', () => {
       saveProfile();
       const code = generate4CharRoomCode();
-      sessionStorage.setItem('sync_room_host_' + code.toLowerCase(), 'true');
+      localStorage.setItem('sync_room_owner_' + code.toLowerCase(), 'true');
       window.location.href = `/room/${code}`;
     });
 
-    // Var Olan Odaya Katıl (Doğrudan İzleyici Olarak)
+    // Var Olan Odaya Katıl (Oda Sahibi İse Hostluğunu Korur, Misafir İse İzleyici Olarak Girer)
     document.getElementById('join-room-btn').addEventListener('click', () => {
       saveProfile();
       const inputVal = document.getElementById('room-code-input').value.trim().toUpperCase();
@@ -241,9 +241,6 @@
         cleanCode = cleanCode.split('/ROOM/')[1];
       }
       cleanCode = cleanCode.replace(/[^A-Z0-9_-]/gi, '');
-
-      // Odaya katılırken host flag'ini temizle ki kesinlikle izleyici olarak girsin
-      sessionStorage.removeItem('sync_room_host_' + cleanCode.toLowerCase());
       window.location.href = `/room/${cleanCode}`;
     });
 

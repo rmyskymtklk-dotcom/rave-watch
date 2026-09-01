@@ -80,14 +80,14 @@ class WebRTCShareEngine {
 
     // ─── İZLEYİCİ: Canlı Video Karesi Al ve Anında Çiz ───
     this.socket.on('screenshare-frame', (data) => {
-      if (this.isSharing) return;
+      if (this.isSharing || this.p2pActive) return;
       this.latestFrame = data instanceof Blob ? data : new Blob([data], { type: 'image/jpeg' });
       this._drawFrame();
     });
 
     // ─── İZLEYİCİ: Canlı PCM Ses Al ───
     this.socket.on('screenshare-audio', (d) => {
-      if (!this.isSharing) {
+      if (!this.isSharing && !this.p2pActive) {
         this._playAudio(d);
       }
     });
@@ -104,6 +104,7 @@ class WebRTCShareEngine {
         this._unlockAudio();
         setTimeout(() => this.socket.emit('guest-needs-stream'), 200);
       } else {
+        this.p2pActive = false;
         if (this.ctx && this.canvas) this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         if (window.syncEngine) window.syncEngine.loadMedia(media);
         window.showToast('📺 Ekran yayını sonlandırıldı.');
@@ -340,6 +341,7 @@ class WebRTCShareEngine {
     this.peerConnections.forEach(pc => { try { pc.close(); } catch(e){} });
     this.peerConnections.clear();
     this.isSharing = false;
+    this.p2pActive = false;
     this.lastEncodedBlob = null;
 
     if (this.shareBtn) {
@@ -554,14 +556,21 @@ class WebRTCShareEngine {
 
     if (this.localStream) {
       this.localStream.getTracks().forEach(t => pc.addTrack(t, this.localStream));
+    } else if (!isInitiator) {
+      try {
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+      } catch(e) {}
     }
 
     // Doğrudan P2P Donanım Hızlandırmalı Video Akışı
     pc.ontrack = (event) => {
       if (!this.isSharing && event.streams && event.streams[0]) {
         console.log('[WebRTC] P2P Donanımsal Akış Bağlandı (60 FPS, 0 Lag)');
+        this.p2pActive = true;
         if (this.webrtcVideo) {
           this.webrtcVideo.srcObject = event.streams[0];
+          this.webrtcVideo.muted = false;
           this.webrtcVideo.classList.remove('hidden');
           this.webrtcVideo.style.display = 'block';
           this.webrtcVideo.play().catch(() => {});

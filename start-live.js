@@ -20,7 +20,7 @@ let linkFound = false;
 
 function startTunnel() {
   linkFound = false;
-  currentTunnel = spawn('npx', ['cloudflared', 'tunnel', '--url', 'http://localhost:3000'], { shell: true });
+  currentTunnel = spawn('npx', ['--yes', 'cloudflared', 'tunnel', '--url', 'http://localhost:3000'], { shell: true });
 
   function handleLog(chunk) {
     const str = chunk.toString();
